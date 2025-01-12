@@ -1,0 +1,129 @@
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+h1 {
+  text-align: center;
+  color: #333;
+}
+
+.upload-section {
+  margin: 20px 0;
+  text-align: center;
+}
+
+.editor-container {
+  display: flex;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.cropper-section {
+  flex: 2;
+}
+
+.preview-section {
+  flex: 1;
+}
+
+.preview-image {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.preview-image img {
+  max-width: 100%;
+  height: auto;
+}
+
+.background-selector {
+  margin: 20px 0;
+  text-align: center;
+}
+
+.color-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+
+.color-button {
+  width: 80px;
+  height: 40px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.color-button {
+  color: white; /* 默认白色字体 */
+}
+
+.color-button[style*="white"],
+.color-button[style*="rgb(255, 255, 255)"],
+.color-button[style*="lightblue"],
+.color-button[style*="rgb(173, 216, 230)"] {
+  color: black !important; /* 强制覆盖默认颜色 */
+}
+
+.color-button.selected {
+  border: 3px solid #007bff !important;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.3) !important;
+  transform: scale(1.05);
+  z-index: 1;
+}
+
+input[type="color"] {
+  margin-top: 10px;
+  width: 100px;
+  height: 40px;
+  border: none;
+  padding: 0;
+}
+
+.crop-button,
+.download-button {
+  display: block;
+  margin: 20px auto;
+  padding: 12px 24px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.crop-button:hover,
+.download-button:hover {
+  background-color: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.crop-button:active,
+.download-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+  .editor-container {
+    flex-direction: column;
+  }
+}
