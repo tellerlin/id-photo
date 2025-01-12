@@ -34,10 +34,10 @@ function App() {
         reader.readAsDataURL(blob);
       } catch (error) {
         console.error('Error removing background:', error);
+        setIsProcessing(false);
         const reader = new FileReader();
         reader.onload = () => {
           setImage(reader.result);
-          setIsProcessing(false);
         };
         reader.readAsDataURL(file);
       }
