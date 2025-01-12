@@ -21,7 +21,10 @@ function App() {
     { name: 'Blue', value: '#007bff' },
     { name: 'Red', value: '#dc3545' },
     { name: 'Gray', value: '#6c757d' },
-    { name: 'Custom', value: 'custom' }
+    { name: 'Light Gray', value: '#f0f0f0' },
+    { name: 'Dark Blue', value: '#003366' },
+    { name: 'Light Red', value: '#ffcccc' },
+    { name: 'Light Green', value: '#ccffcc' }
   ];
 
   const handleImageUpload = async (e) => {
@@ -148,29 +151,6 @@ function App() {
   };
   
   const handleBackgroundChange = async (color) => {
-    // Update background color state immediately
-    setBackgroundColor(color);
-    
-    // Only process image if we have a cropped image
-    if (croppedImage && color !== 'custom') {
-      setIsProcessing(true);
-      setUploadProgress('更换背景颜色...');
-      
-      try {
-        // 使用裁剪后的图片来生成新的图片
-        const newImage = await createImageWithBackground(croppedImage, color);
-        setCroppedImage(newImage);
-      } catch (error) {
-        console.error('Error changing background:', error);
-        setUploadProgress('背景更换失败，请重试');
-      } finally {
-        setIsProcessing(false);
-      }
-    }
-  };
-  
-  const handleCustomColorChange = async (e) => {
-    const color = e.target.value;
     setBackgroundColor(color);
     
     if (croppedImage) {
@@ -178,7 +158,6 @@ function App() {
       setUploadProgress('更换背景颜色...');
       
       try {
-        // 使用裁剪后的图片来生成新的图片
         const newImage = await createImageWithBackground(croppedImage, color);
         setCroppedImage(newImage);
       } catch (error) {
@@ -189,7 +168,6 @@ function App() {
       }
     }
   };
-  
 
   return (
     <div className="app">
@@ -278,29 +256,18 @@ function App() {
           <h3>选择背景颜色</h3>
           <div className="color-buttons">
             {presetColors.map((color) => (
-              <div key={color.value}>
-                <button
-                  className={`color-button ${backgroundColor === color.value ? 'selected' : ''}`}
-                  style={{
-                    backgroundColor: color.value === 'custom' ? backgroundColor : color.value,
-                    color: ['#ffffff', '#a6d8ff'].includes(color.value) ? '#1a1a1a' : 'white',
-                  }}
-                  onClick={() => handleBackgroundChange(color.value)}
-                  data-color={color.value}
-                  disabled={isProcessing}
-                >
-                  {color.name}
-                </button>
-                {color.value === 'custom' && (
-                  <input
-                    type="color"
-                    className="color-picker"
-                    value={backgroundColor}
-                    onChange={handleCustomColorChange}
-                    disabled={isProcessing}
-                  />
-                )}
-              </div>
+              <button
+                key={color.value}
+                className={`color-button ${backgroundColor === color.value ? 'selected' : ''}`}
+                style={{
+                  backgroundColor: color.value,
+                  color: ['#ffffff', '#a6d8ff'].includes(color.value) ? '#1a1a1a' : 'white',
+                }}
+                onClick={() => handleBackgroundChange(color.value)}
+                disabled={isProcessing}
+              >
+                {color.name}
+              </button>
             ))}
           </div>
         </div>
