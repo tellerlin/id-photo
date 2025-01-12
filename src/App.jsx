@@ -310,10 +310,7 @@ function App() {
                     type="color"
                     className="color-picker"
                     value={backgroundColor}
-                    onChange={(e) => {
-                      setBackgroundColor(e.target.value);
-                      handleCrop();
-                    }}
+                    onChange={handleCustomColorChange}
                     disabled={isProcessing}
                   />
                 )}
