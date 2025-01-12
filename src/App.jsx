@@ -165,8 +165,28 @@ function App() {
   };
 
   const handleBackgroundChange = async (color) => {
-    if (color === 'custom') return;
+    // Update background color state immediately
+    setBackgroundColor(color);
     
+    // Only process image if we have a cropped image
+    if (croppedImage && color !== 'custom') {
+      setIsProcessing(true);
+      setUploadProgress('更换背景颜色...');
+      
+      try {
+        const newImage = await createImageWithBackground(processedImage, color);
+        setCroppedImage(newImage);
+      } catch (error) {
+        console.error('Error changing background:', error);
+        setUploadProgress('背景更换失败，请重试');
+      } finally {
+        setIsProcessing(false);
+      }
+    }
+  };
+
+  const handleCustomColorChange = async (e) => {
+    const color = e.target.value;
     setBackgroundColor(color);
     
     if (croppedImage) {
