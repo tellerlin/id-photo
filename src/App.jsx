@@ -22,26 +22,20 @@ function App() {
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
-    console.log('File selected:', file);
     if (file) {
       setIsProcessing(true);
       try {
-        console.log('Starting background removal...');
         const blob = await removeBackground(file);
-        console.log('Background removal successful');
         const reader = new FileReader();
         reader.onload = () => {
-          console.log('File read complete');
           setImage(reader.result);
           setIsProcessing(false);
         };
         reader.readAsDataURL(blob);
       } catch (error) {
         console.error('Error removing background:', error);
-        console.log('Falling back to original image');
         const reader = new FileReader();
         reader.onload = () => {
-          console.log('Original file read complete');
           setImage(reader.result);
           setIsProcessing(false);
         };
@@ -56,17 +50,13 @@ function App() {
       const canvas = cropper.getCroppedCanvas();
       const ctx = canvas.getContext('2d');
       
-      // Create new canvas with background color
       const newCanvas = document.createElement('canvas');
       newCanvas.width = canvas.width;
       newCanvas.height = canvas.height;
       const newCtx = newCanvas.getContext('2d');
       
-      // Fill background
       newCtx.fillStyle = backgroundColor;
       newCtx.fillRect(0, 0, newCanvas.width, newCanvas.height);
-      
-      // Draw original image on top
       newCtx.drawImage(canvas, 0, 0);
       
       setCroppedImage(newCanvas.toDataURL());
@@ -101,8 +91,10 @@ function App() {
         <div className="editor-container">
           {isProcessing && (
             <div className="processing-overlay">
-              <div className="spinner"></div>
-              <p>Processing image...</p>
+              <div className="loading-spinner">
+                <div className="spinner-circle"></div>
+                <div className="spinner-text">Processing...</div>
+              </div>
             </div>
           )}
           <div className="cropper-section">
@@ -132,38 +124,38 @@ function App() {
 
       {croppedImage && (
         <div className="background-selector">
-        <h3>Background Color</h3>
-        <div className="color-buttons">
-          {presetColors.map((color) => (
-            <div key={color.value} style={{ position: 'relative' }}>
-              <button
-                className={`color-button ${backgroundColor === color.value ? 'selected' : ''} ${
-                  color.value === 'custom' && backgroundColor !== '#ffffff' ? 'custom-selected' : ''
-                }`}
-                style={{
-                  backgroundColor: color.value === 'custom' ? 'transparent' : color.value,
-                  border: color.value === 'custom' ? '2px dashed #ccc' : 'none',
-                  '--custom-color': color.value === 'custom' ? backgroundColor : undefined
-                }}
-                onClick={() => handleBackgroundChange(color.value)}
-              >
-                {color.name}
-              </button>
-              {color.value === 'custom' && (
-                <input
-                  type="color"
-                  className="color-picker"
-                  value={backgroundColor}
-                  onChange={(e) => {
-                    setBackgroundColor(e.target.value);
-                    handleCrop();
+          <h3>Background Color</h3>
+          <div className="color-buttons">
+            {presetColors.map((color) => (
+              <div key={color.value} style={{ position: 'relative' }}>
+                <button
+                  className={`color-button ${backgroundColor === color.value ? 'selected' : ''} ${
+                    color.value === 'custom' && backgroundColor !== '#ffffff' ? 'custom-selected' : ''
+                  }`}
+                  style={{
+                    backgroundColor: color.value === 'custom' ? 'transparent' : color.value,
+                    border: color.value === 'custom' ? '2px dashed #ccc' : 'none',
+                    '--custom-color': color.value === 'custom' ? backgroundColor : undefined
                   }}
-                />
-              )}
-            </div>
-          ))}
+                  onClick={() => handleBackgroundChange(color.value)}
+                >
+                  {color.name}
+                </button>
+                {color.value === 'custom' && (
+                  <input
+                    type="color"
+                    className="color-picker"
+                    value={backgroundColor}
+                    onChange={(e) => {
+                      setBackgroundColor(e.target.value);
+                      handleCrop();
+                    }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
       )}
       
       {croppedImage && (
