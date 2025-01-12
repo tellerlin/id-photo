@@ -1,4 +1,3 @@
-// App.jsx
 import React, { useRef, useState, useEffect } from 'react';
 import Cropper from 'react-cropper';
 import { removeBackground } from '@imgly/background-removal';
@@ -15,6 +14,7 @@ function App() {
     const [processedImage, setProcessedImage] = useState(null);
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const [imageKey, setImageKey] = useState(0);
+    const [correctionImage, setCorrectionImage] = useState(null);
 
     const presetColors = [
         { name: 'White', value: '#ffffff' },
@@ -45,6 +45,7 @@ function App() {
                 setProcessingMessage('Processing image');
                 setShowSuccessMessage(false);
                 setImageKey((prevKey) => prevKey + 1);
+                setCorrectionImage(null);
 
                 const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
                 if (!validTypes.includes(file.type)) {
@@ -53,7 +54,7 @@ function App() {
 
                 const blob = await removeBackground(file);
                 const reader = new FileReader();
-                
+
                 return new Promise((resolve, reject) => {
                     reader.onloadend = () => {
                         const safeDataURL = reader.result.startsWith('data:image')
@@ -84,7 +85,7 @@ function App() {
 
                         img.onerror = () => {
                             setIsProcessing(false);
-                            reject(new Error('图像加载失败'));
+                            reject(new Error('Image loading failed'));
                         };
 
                         img.src = safeDataURL;
@@ -92,18 +93,19 @@ function App() {
 
                     reader.onerror = () => {
                         setIsProcessing(false);
-                        reject(new Error('文件读取失败'));
+                        reject(new Error('File reading failed'));
                     };
 
                     reader.readAsDataURL(blob);
                 });
 
             } catch (error) {
-                console.error('图片处理错误:', error);
-                setProcessingMessage(error.message || '处理失败');
+                console.error('Image processing error:', error);
+                setProcessingMessage(error.message || 'Processing failed');
                 setImage(null);
                 setProcessedImage(null);
                 setCroppedImage(null);
+                setCorrectionImage(null);
             } finally {
                 setIsProcessing(false);
             }
@@ -117,6 +119,7 @@ function App() {
             const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas();
             const croppedImageDataURL = croppedCanvas.toDataURL('image/png');
             setCroppedImage(croppedImageDataURL);
+            setCorrectionImage(croppedImageDataURL);
         } catch (error) {
             console.error('Error updating preview:', error);
         }
@@ -150,7 +153,7 @@ function App() {
 
         try {
             setIsProcessing(true);
-            setProcessingMessage('更换背景颜色');
+            setProcessingMessage('Changing background color');
             setBackgroundColor(color);
 
             const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas({
@@ -172,7 +175,7 @@ function App() {
 
         } catch (error) {
             console.error('Error changing background:', error);
-            setProcessingMessage('背景更换失败,请重试');
+            setProcessingMessage('Failed to change background, please try again');
             setTimeout(() => {
                 setProcessingMessage('');
             }, 3000);
@@ -187,7 +190,11 @@ function App() {
                 <h1>ID Photo Generator</h1>
                 <p>Create professional ID photos with automatic background removal</p>
             </header>
-            
+           
+             <div className="process-steps">
+                <p><strong>Process Steps:</strong> Upload Photo - Crop Photo - Select Background - Download Photo</p>
+            </div>
+
             <div className="upload-section">
                 <div className="file-input-wrapper">
                     <input
@@ -232,17 +239,33 @@ function App() {
                         </div>
                     </div>
                     
-                    <div className="cropper-section">
+                     <div className="cropper-section">
                         <Cropper
                             src={image}
                             style={{ height: 400, width: '100%' }}
-                            aspectRatio={3 / 4}
+                            aspectRatio={1/1}
                             guides={true}
                             ref={cropperRef}
                             zoomable={false}
                             zoomOnWheel={false}
                             crop={handleCropChange}
                         />
+                    </div>
+
+                       <div className="correction-section">
+                        {correctionImage && (
+                            <div className="correction-image-container">
+                                <img
+                                    src={correctionImage}
+                                    alt="Correction image"
+                                    className="correction-base-image"
+                                    style={{ display: isProcessing && !correctionImage ? 'none' : 'block' }}
+                                />
+                                  <div className="correction-overlay">
+                                        <img src="/outline.png" alt="Outline" style={{ opacity: 0.5 }} />
+                                  </div>
+                            </div>
+                        )}
                     </div>
 
                     { (croppedImage || processedImage || image) && (
