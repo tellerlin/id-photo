@@ -220,40 +220,55 @@ const handleImageUpload = async (e) => {
     }
   };
   
-   
+
 const handleBackgroundChange = async (color) => {
-  if (!processedImage) return;
+  if (!processedImage || !croppedImage) return;
 
 
   try {
-      setIsProcessing(true);
-      setUploadProgress('更换背景颜色...');
-      setBackgroundColor(color);
+    setIsProcessing(true);
+    setUploadProgress('更换背景颜色...');
+    setBackgroundColor(color);
 
 
-      // 确保是完整的 data URL
-      const fullBase64Image = processedImage.startsWith('data:image')
-          ? processedImage
-          : `data:image/png;base64,${processedImage}`;
+    // 使用 cropperRef 重新裁剪
+    const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas({
+      // 使用与之前相同的裁剪设置
+      width: cropperRef.current.cropper.getCroppedCanvas().width,
+      height: cropperRef.current.cropper.getCroppedCanvas().height
+    });
 
 
-      console.log('Creating new image with background:', color);
-      const newImageWithBackground = await createImageWithBackground(fullBase64Image, color);
-      console.log('New image created:', newImageWithBackground);
-      
-      // 直接设置新图像
-      setCroppedImage(newImageWithBackground);
-      console.log('Cropped image updated');
-      
-      setUploadProgress('');
+    // 在裁剪的 canvas 上添加背景色
+    const canvas = document.createElement('canvas');
+    canvas.width = croppedCanvas.width;
+    canvas.height = croppedCanvas.height;
+    const ctx = canvas.getContext('2d');
+
+
+    // 填充背景色
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+
+    // 绘制裁剪后的图像
+    ctx.drawImage(croppedCanvas, 0, 0);
+
+
+    // 生成新的图像
+    const newImageWithBackground = canvas.toDataURL('image/png');
+    
+    // 更新裁剪图像
+    setCroppedImage(newImageWithBackground);
+    
+    setUploadProgress('');
   } catch (error) {
-      console.error('Error changing background:', error);
-      setUploadProgress('背景更换失败,请重试');
+    console.error('Error changing background:', error);
+    setUploadProgress('背景更换失败,请重试');
   } finally {
-      setIsProcessing(false);
+    setIsProcessing(false);
   }
 };
-
   // ... in your JSX ... 
 {(croppedImage || processedImage || image) && (
   <div className="preview-section">
