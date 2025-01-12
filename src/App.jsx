@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import Cropper from 'react-cropper';
 import { removeBackground } from '@imgly/background-removal';
 import 'cropperjs/dist/cropper.css';
@@ -26,6 +26,13 @@ function App() {
     { name: 'Light Red', value: '#ffcccc' },
     { name: 'Light Green', value: '#ccffcc' }
   ];
+
+  useEffect(() => {
+    if (processedImage) {
+      setCroppedImage(processedImage);
+    }
+  }, [processedImage]);
+  
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -85,39 +92,48 @@ function App() {
     }
   };
 
+
   const createImageWithBackground = (imageData, bgColor) => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
+        console.log('Image loaded successfully');
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
         canvas.height = img.height;
         const ctx = canvas.getContext('2d');
-
+  
         ctx.fillStyle = bgColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0);
-
-        resolve(canvas.toDataURL('image/png'));
+  
+        const dataURL = canvas.toDataURL('image/png');
+        console.log('Generated DataURL:', dataURL); // 输出 DataURL 到控制台
+        resolve(dataURL);
+      };
+      img.onerror = () => {
+        console.error('Error loading image');
+        reject(new Error('Failed to load image'));
       };
       img.src = imageData;
     });
   };
-
+  
+  
   const handleCrop = async () => {
     if (!cropperRef.current?.cropper || !processedImage) return;
-    
+  
     try {
       setIsProcessing(true);
       setUploadProgress('正在裁剪图片...');
-      
+  
       const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas();
-      
-      // 直接将裁剪后的图片设置为 croppedImage
       const croppedImageDataURL = croppedCanvas.toDataURL('image/png');
+  
       setCroppedImage(croppedImageDataURL);
-      
-      setUploadProgress('');
+      console.log('Image cropped successfully');
+      setUploadProgress(''); // Clear progress message after successful crop
+  
     } catch (error) {
       console.error('Error cropping image:', error);
       setUploadProgress('裁剪失败，请重试');
@@ -126,6 +142,7 @@ function App() {
     }
   };
   
+    
   const handleDownload = async () => {
     if (!croppedImage) return;
   
@@ -150,25 +167,40 @@ function App() {
     }
   };
   
+  
   const handleBackgroundChange = async (color) => {
-    setBackgroundColor(color);
-    
-    if (croppedImage) {
+    if (!croppedImage) return; // Important: Handle the case where there's no image yet
+  
+    try {
       setIsProcessing(true);
       setUploadProgress('更换背景颜色...');
-      
-      try {
-        const newImage = await createImageWithBackground(croppedImage, color);
-        setCroppedImage(newImage);
-      } catch (error) {
-        console.error('Error changing background:', error);
-        setUploadProgress('背景更换失败，请重试');
-      } finally {
-        setIsProcessing(false);
-      }
+      setBackgroundColor(color); // Set the background color state immediately
+  
+  
+      const newImage = await createImageWithBackground(croppedImage, color);
+      setCroppedImage(newImage); // Update the croppedImage state with the new image data URL
+      setUploadProgress(''); // Clear progress message after the change
+  
+    } catch (error) {
+      console.error('Error changing background:', error);
+      setUploadProgress('背景更换失败，请重试');
+    } finally {
+      setIsProcessing(false);
     }
   };
-
+  
+  
+  // ... in your JSX ...
+  {croppedImage && (
+      <div className="preview-section">
+          <div className="preview-image">
+              <img src={`${croppedImage}?bg=${backgroundColor}`} alt="Cropped" /> {/* Add cache busting here */}
+          </div>
+      </div>
+  )}
+  
+  
+  
   return (
     <div className="app">
       <header className="header">
@@ -237,17 +269,14 @@ function App() {
             </button>
           </div>
 
-          <div className="preview-section">
-            {croppedImage ? (
-              <div className="preview-image">
-                <img src={croppedImage} alt="Cropped" />
-              </div>
-            ) : (
-              <div className="preview-placeholder">
-                <p>请先裁剪图片</p>
-              </div>
-            )}
-          </div>
+          {croppedImage && ( // Only render the img if croppedImage exists
+            <div className="preview-section">
+                <div className="preview-image">
+                  <img src={croppedImage} alt="Cropped" key={croppedImage} /> 
+                </div>
+            </div>
+          )}
+
         </div>
       )}
 
