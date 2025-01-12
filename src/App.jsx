@@ -89,14 +89,12 @@ function App() {
 
       {image && (
         <div className="editor-container">
-          {isProcessing && (
-            <div className="processing-overlay">
-              <div className="loading-spinner">
-                <div className="spinner-circle"></div>
-                <div className="spinner-text">Processing...</div>
-              </div>
+          <div className="processing-overlay" style={{ display: isProcessing ? 'flex' : 'none' }}>
+            <div className="loading-spinner">
+              <div className="spinner-circle"></div>
+              <div className="spinner-text">Processing...</div>
             </div>
-          )}
+          </div>
           <div className="cropper-section">
             <Cropper
               src={image}
