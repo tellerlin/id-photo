@@ -110,28 +110,11 @@ function App() {
       
       const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas();
       
-      const tempImage = new Image();
-      tempImage.onload = async () => {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = croppedCanvas.width;
-          canvas.height = croppedCanvas.height;
-          const ctx = canvas.getContext('2d');
-          
-          ctx.drawImage(tempImage, 0, 0, canvas.width, canvas.height);
-          
-          const finalImage = await createImageWithBackground(canvas.toDataURL(), backgroundColor);
-          setCroppedImage(finalImage);
-          setUploadProgress('');
-        } catch (error) {
-          console.error('Error processing cropped image:', error);
-          setUploadProgress('裁剪失败，请重试');
-        }
-      };
-      tempImage.onerror = () => {
-        throw new Error('Failed to load image');
-      };
-      tempImage.src = processedImage;
+      // 直接将裁剪后的图片设置为 croppedImage
+      const croppedImageDataURL = croppedCanvas.toDataURL('image/png');
+      setCroppedImage(croppedImageDataURL);
+      
+      setUploadProgress('');
     } catch (error) {
       console.error('Error cropping image:', error);
       setUploadProgress('裁剪失败，请重试');
@@ -139,10 +122,10 @@ function App() {
       setIsProcessing(false);
     }
   };
-
+  
   const handleDownload = async () => {
     if (!croppedImage) return;
-
+  
     try {
       const response = await fetch(croppedImage);
       const blob = await response.blob();
@@ -163,7 +146,7 @@ function App() {
       }, 3000);
     }
   };
-
+  
   const handleBackgroundChange = async (color) => {
     // Update background color state immediately
     setBackgroundColor(color);
@@ -174,7 +157,8 @@ function App() {
       setUploadProgress('更换背景颜色...');
       
       try {
-        const newImage = await createImageWithBackground(processedImage, color);
+        // 使用裁剪后的图片来生成新的图片
+        const newImage = await createImageWithBackground(croppedImage, color);
         setCroppedImage(newImage);
       } catch (error) {
         console.error('Error changing background:', error);
@@ -184,7 +168,7 @@ function App() {
       }
     }
   };
-
+  
   const handleCustomColorChange = async (e) => {
     const color = e.target.value;
     setBackgroundColor(color);
@@ -194,7 +178,8 @@ function App() {
       setUploadProgress('更换背景颜色...');
       
       try {
-        const newImage = await createImageWithBackground(processedImage, color);
+        // 使用裁剪后的图片来生成新的图片
+        const newImage = await createImageWithBackground(croppedImage, color);
         setCroppedImage(newImage);
       } catch (error) {
         console.error('Error changing background:', error);
@@ -204,6 +189,7 @@ function App() {
       }
     }
   };
+  
 
   return (
     <div className="app">
