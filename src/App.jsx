@@ -176,7 +176,7 @@ function App() {
         URL.revokeObjectURL(url);
       } catch (error) {
         console.error('Error downloading image:', error);
-        setProcessingMessage('下载失败，请重试');
+        setProcessingMessage('Download failed, please try again');
   
            setTimeout(() => {
                setProcessingMessage('');
