@@ -86,7 +86,7 @@ function App() {
                       setProcessedImage(finalDataURL);
                       setImage(finalDataURL);
                       setCroppedImage(finalDataURL);
-                      setProcessingMessage('处理完成');
+                    setProcessingMessage('Processing complete');
                       setShowSuccessMessage(true);
   
                       // 3秒后隐藏成功消息
@@ -149,7 +149,7 @@ function App() {
     
       } catch (error) {
         console.error('Error cropping image:', error);
-         setProcessingMessage('裁剪失败，请重试');
+         setProcessingMessage('Crop failed, please try again');
   
            setTimeout(() => {
                setProcessingMessage('');
