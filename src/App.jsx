@@ -79,7 +79,6 @@ function App() {
           </div>
 
           <div className="preview-section">
-            <h3>Preview</h3>
             {croppedImage ? (
               <div className="preview-image" style={{ backgroundColor }}>
                 <img src={croppedImage} alt="Cropped" />
@@ -91,7 +90,8 @@ function App() {
         </div>
       )}
 
-      <div className="background-selector">
+      {croppedImage && (
+        <div className="background-selector">
         <h3>Background Color</h3>
         <div className="color-buttons">
           {presetColors.map((color) => (
@@ -124,7 +124,8 @@ function App() {
           ))}
         </div>
       </div>
-
+      )}
+      
       {croppedImage && (
         <button onClick={handleDownload} className="download-button">
           Download ID Photo
