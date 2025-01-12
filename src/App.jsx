@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import Cropper from 'react-cropper';
+import { removeBackground } from '@imgly/background-removal';
 import 'cropperjs/dist/cropper.css';
 import './App.css';
 
@@ -7,6 +8,7 @@ function App() {
   const [image, setImage] = useState(null);
   const [croppedImage, setCroppedImage] = useState(null);
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
+  const [isProcessing, setIsProcessing] = useState(false);
   const cropperRef = useRef(null);
 
   const presetColors = [
@@ -18,24 +20,56 @@ function App() {
     { name: 'Custom', value: 'custom' }
   ];
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
+    console.log('File selected:', file);
     if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setImage(reader.result);
-      };
-      reader.readAsDataURL(file);
+      setIsProcessing(true);
+      try {
+        console.log('Starting background removal...');
+        const blob = await removeBackground(file);
+        console.log('Background removal successful');
+        const reader = new FileReader();
+        reader.onload = () => {
+          console.log('File read complete');
+          setImage(reader.result);
+          setIsProcessing(false);
+        };
+        reader.readAsDataURL(blob);
+      } catch (error) {
+        console.error('Error removing background:', error);
+        console.log('Falling back to original image');
+        const reader = new FileReader();
+        reader.onload = () => {
+          console.log('Original file read complete');
+          setImage(reader.result);
+          setIsProcessing(false);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
   const handleCrop = () => {
     const cropper = cropperRef.current?.cropper;
     if (cropper) {
-      const canvas = cropper.getCroppedCanvas({
-        fillColor: backgroundColor,
-      });
-      setCroppedImage(canvas.toDataURL());
+      const canvas = cropper.getCroppedCanvas();
+      const ctx = canvas.getContext('2d');
+      
+      // Create new canvas with background color
+      const newCanvas = document.createElement('canvas');
+      newCanvas.width = canvas.width;
+      newCanvas.height = canvas.height;
+      const newCtx = newCanvas.getContext('2d');
+      
+      // Fill background
+      newCtx.fillStyle = backgroundColor;
+      newCtx.fillRect(0, 0, newCanvas.width, newCanvas.height);
+      
+      // Draw original image on top
+      newCtx.drawImage(canvas, 0, 0);
+      
+      setCroppedImage(newCanvas.toDataURL());
     }
   };
 
@@ -65,6 +99,12 @@ function App() {
 
       {image && (
         <div className="editor-container">
+          {isProcessing && (
+            <div className="processing-overlay">
+              <div className="spinner"></div>
+              <p>Processing image...</p>
+            </div>
+          )}
           <div className="cropper-section">
             <Cropper
               src={image}
