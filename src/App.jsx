@@ -7,7 +7,6 @@ function App() {
   const [image, setImage] = useState(null);
   const [croppedImage, setCroppedImage] = useState(null);
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
-  const [showColorPicker, setShowColorPicker] = useState(false);
   const cropperRef = useRef(null);
 
   const presetColors = [
@@ -50,11 +49,8 @@ function App() {
   };
 
   const handleBackgroundChange = (color) => {
-    if (color === 'custom') {
-      setShowColorPicker(true);
-    } else {
+    if (color !== 'custom') {
       setBackgroundColor(color);
-      setShowColorPicker(false);
       handleCrop();
     }
   };
@@ -99,30 +95,31 @@ function App() {
         <h3>Background Color</h3>
         <div className="color-buttons">
           {presetColors.map((color) => (
-            <button
-              key={color.value}
-              className={`color-button ${backgroundColor === color.value ? 'selected' : ''}`}
-              style={{
-                backgroundColor: color.value === 'custom' ? 'transparent' : color.value,
-                border: color.value === 'custom' ? '2px dashed #ccc' : 'none'
-              }}
-              onClick={() => handleBackgroundChange(color.value)}
-            >
-              {color.name}
-            </button>
+            <div key={color.value} style={{ position: 'relative' }}>
+              <button
+                className={`color-button ${backgroundColor === color.value ? 'selected' : ''}`}
+                style={{
+                  backgroundColor: color.value === 'custom' ? 'transparent' : color.value,
+                  border: color.value === 'custom' ? '2px dashed #ccc' : 'none'
+                }}
+                onClick={() => handleBackgroundChange(color.value)}
+              >
+                {color.name}
+              </button>
+              {color.value === 'custom' && (
+                <input
+                  type="color"
+                  className="color-picker"
+                  value={backgroundColor}
+                  onChange={(e) => {
+                    setBackgroundColor(e.target.value);
+                    handleCrop();
+                  }}
+                />
+              )}
+            </div>
           ))}
         </div>
-
-        {showColorPicker && (
-          <input
-            type="color"
-            value={backgroundColor}
-            onChange={(e) => {
-              setBackgroundColor(e.target.value);
-              handleCrop();
-            }}
-          />
-        )}
       </div>
 
       {croppedImage && (

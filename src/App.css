@@ -65,6 +65,12 @@ h1 {
   justify-content: center;
   font-size: 14px;
   transition: all 0.2s ease;
+  position: relative;
+}
+
+.color-button[style*="white"],
+.color-button[style*="rgb(255, 255, 255)"] {
+  border: 2px solid #ddd;
 }
 
 .color-button {
@@ -74,8 +80,19 @@ h1 {
 .color-button[style*="white"],
 .color-button[style*="rgb(255, 255, 255)"],
 .color-button[style*="lightblue"],
-.color-button[style*="rgb(173, 216, 230)"] {
+.color-button[style*="rgb(173, 216, 230)"],
+.color-button[style*="custom"] {
   color: black !important; /* 强制覆盖默认颜色 */
+}
+
+.color-picker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .color-button.selected {
