@@ -26,7 +26,10 @@ h1 {
 }
 
 .preview-section {
-  flex: 1;
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .preview-image {
@@ -43,6 +46,12 @@ h1 {
 .preview-image img {
   max-height: 100%;
   width: auto;
+}
+
+.preview-section h3 {
+  order: 2;
+  margin: 10px 0 0 0;
+  text-align: center;
 }
 
 .background-selector {
@@ -83,8 +92,7 @@ h1 {
 
 .color-button[style*="white"],
 .color-button[style*="rgb(255, 255, 255)"],
-.color-button[style*="lightblue"],
-.color-button[style*="rgb(173, 216, 230)"],
+.color-button[style*="a6d8ff"],
 .color-button[style*="custom"] {
   color: black !important;
   position: relative;
@@ -93,10 +101,12 @@ h1 {
 .color-button.custom-selected {
   background-color: var(--custom-color, transparent) !important;
   border: 2px solid var(--custom-color, #ccc) !important;
+  box-shadow: 0 0 0 2px var(--custom-color, #ccc) !important;
 }
 
 .color-button.custom-selected[style*="custom"] {
   color: white !important;
+  border-style: solid !important;
 }
 
 .color-picker {
