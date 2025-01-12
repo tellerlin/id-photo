@@ -293,6 +293,8 @@ function App() {
                 aspectRatio={3 / 4}
                 guides={true}
                 ref={cropperRef}
+                zoomable={false}
+                zoomOnWheel={false}
               />
               <button 
                 onClick={handleCrop} 
