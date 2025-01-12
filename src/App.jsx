@@ -9,9 +9,11 @@ function App() {
   const [croppedImage, setCroppedImage] = useState(null);
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState('Preparing your photo...');
+  const [uploadProgress, setUploadProgress] = useState('');
+  const [uploadStatus, setUploadStatus] = useState('');
   const cropperRef = useRef(null);
   const [processedImage, setProcessedImage] = useState(null);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   const presetColors = [
     { name: 'White', value: '#ffffff' },
@@ -25,26 +27,57 @@ function App() {
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      setIsProcessing(true);
-      setUploadProgress('Removing background...');
-      
       try {
-        const blob = await removeBackground(file);
-        setUploadProgress('Finalizing...');
+        setIsProcessing(true);
+        setUploadStatus('uploading');
+        setUploadProgress('正在上传图片...');
+        setCroppedImage(null);
+        setShowSuccessMessage(false);
         
-        // Convert blob to base64 and store it
+        // 模拟上传进度
+        const updateProgress = (progress) => {
+          setUploadProgress(`处理中... ${progress}%`);
+        };
+        
+        // 每200ms更新一次进度，总共10次
+        for (let i = 10; i <= 90; i += 10) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+          updateProgress(i);
+        }
+        
+        setUploadProgress('正在移除背景...');
+        const blob = await removeBackground(file);
+        
+        setUploadProgress('处理完成');
+        setUploadStatus('success');
+        
         const reader = new FileReader();
         reader.onload = () => {
-          setProcessedImage(reader.result); // Store the processed image
+          setProcessedImage(reader.result);
           setImage(reader.result);
-          setIsProcessing(false);
-          setUploadProgress('Preparing your photo...');
+          setShowSuccessMessage(true);
+          
+          // 3秒后隐藏成功消息
+          setTimeout(() => {
+            setShowSuccessMessage(false);
+          }, 3000);
+        };
+        reader.onerror = () => {
+          throw new Error('Failed to read file');
         };
         reader.readAsDataURL(blob);
       } catch (error) {
-        console.error('Error removing background:', error);
+        console.error('Error processing image:', error);
+        setUploadStatus('error');
+        setUploadProgress('处理失败，请重试');
+        
+        // 3秒后清除错误消息
+        setTimeout(() => {
+          setUploadProgress('');
+          setUploadStatus('');
+        }, 3000);
+      } finally {
         setIsProcessing(false);
-        setUploadProgress('Error processing image. Please try again.');
       }
     }
   };
@@ -58,11 +91,8 @@ function App() {
         canvas.height = img.height;
         const ctx = canvas.getContext('2d');
 
-        // Fill background
         ctx.fillStyle = bgColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Draw the image
         ctx.drawImage(img, 0, 0);
 
         resolve(canvas.toDataURL('image/png'));
@@ -72,26 +102,41 @@ function App() {
   };
 
   const handleCrop = async () => {
-    const cropper = cropperRef.current?.cropper;
-    if (cropper && processedImage) {
-      const croppedCanvas = cropper.getCroppedCanvas();
+    if (!cropperRef.current?.cropper || !processedImage) return;
+    
+    try {
+      setIsProcessing(true);
+      setUploadProgress('正在裁剪图片...');
       
-      // Create a temporary image to handle the cropped data
+      const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas();
+      
       const tempImage = new Image();
       tempImage.onload = async () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = croppedCanvas.width;
-        canvas.height = croppedCanvas.height;
-        const ctx = canvas.getContext('2d');
-        
-        // Draw cropped image
-        ctx.drawImage(tempImage, 0, 0, canvas.width, canvas.height);
-        
-        // Apply background color
-        const finalImage = await createImageWithBackground(canvas.toDataURL(), backgroundColor);
-        setCroppedImage(finalImage);
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = croppedCanvas.width;
+          canvas.height = croppedCanvas.height;
+          const ctx = canvas.getContext('2d');
+          
+          ctx.drawImage(tempImage, 0, 0, canvas.width, canvas.height);
+          
+          const finalImage = await createImageWithBackground(canvas.toDataURL(), backgroundColor);
+          setCroppedImage(finalImage);
+          setUploadProgress('');
+        } catch (error) {
+          console.error('Error processing cropped image:', error);
+          setUploadProgress('裁剪失败，请重试');
+        }
+      };
+      tempImage.onerror = () => {
+        throw new Error('Failed to load image');
       };
       tempImage.src = processedImage;
+    } catch (error) {
+      console.error('Error cropping image:', error);
+      setUploadProgress('裁剪失败，请重试');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -111,14 +156,31 @@ function App() {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error downloading image:', error);
+      setUploadProgress('下载失败，请重试');
+      
+      setTimeout(() => {
+        setUploadProgress('');
+      }, 3000);
     }
   };
 
-  const handleBackgroundChange = (color) => {
-    if (color !== 'custom') {
-      setBackgroundColor(color);
-      if (cropperRef.current?.cropper) {
-        handleCrop();
+  const handleBackgroundChange = async (color) => {
+    if (color === 'custom') return;
+    
+    setBackgroundColor(color);
+    
+    if (croppedImage) {
+      setIsProcessing(true);
+      setUploadProgress('更换背景颜色...');
+      
+      try {
+        const newImage = await createImageWithBackground(processedImage, color);
+        setCroppedImage(newImage);
+      } catch (error) {
+        console.error('Error changing background:', error);
+        setUploadProgress('背景更换失败，请重试');
+      } finally {
+        setIsProcessing(false);
       }
     }
   };
@@ -137,8 +199,9 @@ function App() {
             accept="image/*"
             onChange={handleImageUpload}
             className="file-input"
+            disabled={isProcessing}
           />
-          <button className="upload-button">
+          <button className={`upload-button ${isProcessing ? 'disabled' : ''}`}>
             <svg
               width="24"
               height="24"
@@ -153,9 +216,15 @@ function App() {
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
-            Upload Photo
+            {isProcessing ? '处理中...' : '上传照片'}
           </button>
         </div>
+        
+        {showSuccessMessage && (
+          <div className="success-message">
+            图片上传成功！
+          </div>
+        )}
       </div>
 
       {image && (
@@ -175,8 +244,12 @@ function App() {
               guides={true}
               ref={cropperRef}
             />
-            <button onClick={handleCrop} className="button button-primary">
-              Crop Image
+            <button 
+              onClick={handleCrop} 
+              className="button button-primary"
+              disabled={isProcessing}
+            >
+              {isProcessing ? '处理中...' : '裁剪图片'}
             </button>
           </div>
 
@@ -187,7 +260,7 @@ function App() {
               </div>
             ) : (
               <div className="preview-placeholder">
-                <p>Please crop your image first</p>
+                <p>请先裁剪图片</p>
               </div>
             )}
           </div>
@@ -196,7 +269,7 @@ function App() {
 
       {croppedImage && (
         <div className="background-selector">
-          <h3>Choose Background Color</h3>
+          <h3>选择背景颜色</h3>
           <div className="color-buttons">
             {presetColors.map((color) => (
               <div key={color.value}>
@@ -208,6 +281,7 @@ function App() {
                   }}
                   onClick={() => handleBackgroundChange(color.value)}
                   data-color={color.value}
+                  disabled={isProcessing}
                 >
                   {color.name}
                 </button>
@@ -220,6 +294,7 @@ function App() {
                       setBackgroundColor(e.target.value);
                       handleCrop();
                     }}
+                    disabled={isProcessing}
                   />
                 )}
               </div>
@@ -230,7 +305,11 @@ function App() {
       
       {croppedImage && (
         <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-          <button onClick={handleDownload} className="button button-primary">
+          <button 
+            onClick={handleDownload} 
+            className="button button-primary"
+            disabled={isProcessing}
+          >
             <svg
               width="20"
               height="20"
@@ -246,7 +325,7 @@ function App() {
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            Download ID Photo
+            下载照片
           </button>
         </div>
       )}

@@ -31,6 +31,7 @@
   text-align: center;
   margin-bottom: 2rem;
   transition: all 0.2s ease;
+  position: relative;
 }
 
 .upload-section:hover {
@@ -50,6 +51,10 @@
   cursor: pointer;
 }
 
+.file-input:disabled {
+  cursor: not-allowed;
+}
+
 .upload-button {
   display: inline-flex;
   align-items: center;
@@ -60,11 +65,42 @@
   border-radius: 8px;
   font-weight: 500;
   transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
 }
 
-.upload-button:hover {
+.upload-button:hover:not(.disabled) {
   background-color: var(--primary-dark);
   transform: translateY(-1px);
+}
+
+.upload-button.disabled {
+  background-color: var(--gray-400);
+  cursor: not-allowed;
+}
+
+.success-message {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #10b981;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translate(-50%, -100%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
 }
 
 .editor-container {
@@ -115,7 +151,6 @@
   width: auto;
 }
 
-/* Loading Animation */
 .processing-overlay {
   position: absolute;
   inset: 0;
@@ -162,7 +197,6 @@
   to { transform: rotate(360deg); }
 }
 
-/* Buttons */
 .button {
   display: inline-flex;
   align-items: center;
@@ -177,21 +211,26 @@
   font-size: 1rem;
 }
 
+.button:disabled {
+  background-color: var(--gray-400) !important;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
 .button-primary {
   background-color: var(--primary);
   color: white;
 }
 
-.button-primary:hover {
+.button-primary:hover:not(:disabled) {
   background-color: var(--primary-dark);
   transform: translateY(-1px);
 }
 
-.button-primary:active {
+.button-primary:active:not(:disabled) {
   transform: translateY(0);
 }
 
-/* Color Selection */
 .background-selector {
   background: white;
   padding: 2rem;
@@ -227,7 +266,12 @@
   transition: all 0.2s ease;
 }
 
-.color-button:hover {
+.color-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.color-button:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: var(--shadow);
 }
@@ -248,7 +292,10 @@
   cursor: pointer;
 }
 
-/* Responsive adjustments */
+.color-picker:disabled {
+  cursor: not-allowed;
+}
+
 @media (max-width: 640px) {
   .app {
     padding: 1rem;
