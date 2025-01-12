@@ -34,11 +34,15 @@ h1 {
   border: 1px solid #ddd;
   border-radius: 4px;
   text-align: center;
+  height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .preview-image img {
-  max-width: 100%;
-  height: auto;
+  max-height: 100%;
+  width: auto;
 }
 
 .background-selector {
@@ -82,7 +86,17 @@ h1 {
 .color-button[style*="lightblue"],
 .color-button[style*="rgb(173, 216, 230)"],
 .color-button[style*="custom"] {
-  color: black !important; /* 强制覆盖默认颜色 */
+  color: black !important;
+  position: relative;
+}
+
+.color-button.custom-selected {
+  background-color: var(--custom-color, transparent) !important;
+  border: 2px solid var(--custom-color, #ccc) !important;
+}
+
+.color-button.custom-selected[style*="custom"] {
+  color: white !important;
 }
 
 .color-picker {

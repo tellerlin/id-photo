@@ -97,10 +97,13 @@ function App() {
           {presetColors.map((color) => (
             <div key={color.value} style={{ position: 'relative' }}>
               <button
-                className={`color-button ${backgroundColor === color.value ? 'selected' : ''}`}
+                className={`color-button ${backgroundColor === color.value ? 'selected' : ''} ${
+                  color.value === 'custom' && backgroundColor !== '#ffffff' ? 'custom-selected' : ''
+                }`}
                 style={{
                   backgroundColor: color.value === 'custom' ? 'transparent' : color.value,
-                  border: color.value === 'custom' ? '2px dashed #ccc' : 'none'
+                  border: color.value === 'custom' ? '2px dashed #ccc' : 'none',
+                  '--custom-color': color.value === 'custom' ? backgroundColor : undefined
                 }}
                 onClick={() => handleBackgroundChange(color.value)}
               >
