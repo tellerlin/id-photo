@@ -9,12 +9,11 @@ function App() {
   const [croppedImage, setCroppedImage] = useState(null);
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState('');
-  const [uploadStatus, setUploadStatus] = useState('');
   const [processingMessage, setProcessingMessage] = useState('');
   const cropperRef = useRef(null);
   const [processedImage, setProcessedImage] = useState(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [imageKey, setImageKey] = useState(0); // 用于图片 src 更新的 key
 
   const presetColors = [
     { name: 'White', value: '#ffffff' },
@@ -35,171 +34,130 @@ function App() {
   }, [processedImage]);
   
 
-const handleImageUpload = async (e) => {
-  const file = e.target.files[0];
-  if (file) {
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
       try {
-          // 重置所有相关状态
-          setImage(null);
-          setProcessedImage(null);
-          setCroppedImage(null);
-          setIsProcessing(true);
-          setProcessingMessage('正在处理图片...');
-          setUploadProgress('');
-          setShowSuccessMessage(false);
+        // 重置所有相关状态
+        setImage(null);
+        setProcessedImage(null);
+        setCroppedImage(null);
+        setIsProcessing(true);
+        setProcessingMessage('正在处理图片');
+        setShowSuccessMessage(false);
+        setImageKey((prevKey) => prevKey + 1);  // 更新 key
+
+        // 文件类型验证
+        const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
+        if (!validTypes.includes(file.type)) {
+            throw new Error('不支持的文件类型');
+        }
+
+        // 移除背景并获取 Blob
+        const blob = await removeBackground(file);
+
+        // 使用 FileReader 读取 Blob
+        const reader = new FileReader();
+        
+        return new Promise((resolve, reject) => {
+          reader.onloadend = () => {
+                // 确保是完整的 data URL
+                const safeDataURL = reader.result.startsWith('data:image')
+                  ? reader.result
+                  : `data:image/png;base64,${reader.result}`;
 
 
-          // 文件验证
-          const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
-          if (!validTypes.includes(file.type)) {
-              throw new Error('不支持的文件类型');
-          }
+                // 创建图像并验证
+                const img = new Image();
+                img.onload = () => {
+                    // 使用 canvas 确保图像可用
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
 
 
-          // 移除背景
-          const blob = await removeBackground(file);
+                    // 生成最终的 data URL
+                    const finalDataURL = canvas.toDataURL('image/png');
+
+                    // 更新状态
+                    setProcessedImage(finalDataURL);
+                    setImage(finalDataURL);
+                    setCroppedImage(finalDataURL);
+                    setProcessingMessage('处理完成');
+                    setShowSuccessMessage(true);
+
+                    // 3秒后隐藏成功消息
+                    setTimeout(() => {
+                        setShowSuccessMessage(false);
+                    }, 3000);
+
+                    resolve();
+                    setIsProcessing(false); // 成功后才取消加载
+                };
 
 
-          // 使用 FileReader 读取 Blob
-          const reader = new FileReader();
-          
-          return new Promise((resolve, reject) => {
-              reader.onloadend = () => {
-                  // 确保是完整的 data URL
-                  const safeDataURL = reader.result.startsWith('data:image')
-                      ? reader.result
-                      : `data:image/png;base64,${reader.result}`;
+                img.onerror = () => {
+                    setIsProcessing(false); // 加载失败时也取消加载
+                    reject(new Error('图像加载失败'));
+                };
 
 
-                  // 创建图像并验证
-                  const img = new Image();
-                  img.onload = () => {
-                      // 使用 canvas 确保图像可用
-                      const canvas = document.createElement('canvas');
-                      canvas.width = img.width;
-                      canvas.height = img.height;
-                      const ctx = canvas.getContext('2d');
-                      ctx.drawImage(img, 0, 0);
+                img.src = safeDataURL;
+            };
 
 
-                      // 生成最终的 data URL
-                      const finalDataURL = canvas.toDataURL('image/png');
+            reader.onerror = () => {
+                setIsProcessing(false); // 读取失败时也取消加载
+                reject(new Error('文件读取失败'));
+            };
 
 
-                      // 更新状态
-                      setProcessedImage(finalDataURL);
-                      setImage(finalDataURL);
-                      setCroppedImage(finalDataURL);
-
-
-                      setProcessingMessage('处理完成');
-                      setUploadProgress('');
-                      setShowSuccessMessage(true);
-
-
-                      // 3秒后隐藏成功消息
-                      setTimeout(() => {
-                          setShowSuccessMessage(false);
-                      }, 3000);
-
-
-                      resolve();
-                  };
-
-
-                  img.onerror = () => {
-                      reject(new Error('图像加载失败'));
-                  };
-
-
-                  img.src = safeDataURL;
-              };
-
-
-              reader.onerror = () => {
-                  reject(new Error('文件读取失败'));
-              };
-
-
-              // 读取 Blob
-              reader.readAsDataURL(blob);
-          });
-
+            // 读取 Blob
+            reader.readAsDataURL(blob);
+        });
 
       } catch (error) {
           console.error('图片处理错误:', error);
           setProcessingMessage(error.message || '处理失败');
-          setUploadProgress('');
-          
+         
           // 重置状态
           setImage(null);
           setProcessedImage(null);
           setCroppedImage(null);
 
-
-      } finally {
-          setIsProcessing(false);
+      }  finally {
+          //  setIsProcessing(false); // 确保加载状态在失败时也关闭，但是要放在resolve之后，处理成功了，才关闭加载动画。
       }
-  }
-};
-
-  const createImageWithBackground = (imageData, bgColor) => {
-    return new Promise((resolve, reject) => {
-      // 确保 imageData 是完整的 Base64 字符串
-      const fullBase64 = imageData.startsWith('data:image') 
-        ? imageData 
-        : `data:image/png;base64,${imageData}`;
-
-
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-  
-        // 先填充背景色
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // 绘制图像
-        ctx.drawImage(img, 0, 0);
-  
-        // 确保返回完整的 data URL
-        const dataURL = canvas.toDataURL('image/png');
-        resolve(dataURL);
-      };
-      img.onerror = (error) => {
-        console.error('Image load error:', error);
-        reject(new Error('Failed to load image'));
-      };
-      img.src = fullBase64;
-    });
-};
+    }
+  };
   
   const handleCrop = async () => {
     if (!cropperRef.current?.cropper || !processedImage) return;
   
     try {
       setIsProcessing(true);
-      setProcessingMessage('正在裁剪图片...');
-      setUploadProgress('');
+      setProcessingMessage('正在裁剪图片');
   
       const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas();
       const croppedImageDataURL = croppedCanvas.toDataURL('image/png');
   
       setCroppedImage(croppedImageDataURL);
       console.log('Image cropped successfully');
-      setUploadProgress(''); // Clear progress message after successful crop
   
     } catch (error) {
       console.error('Error cropping image:', error);
-      setUploadProgress('裁剪失败，请重试');
+       setProcessingMessage('裁剪失败，请重试');
+
+         setTimeout(() => {
+             setProcessingMessage('');
+        }, 3000);
+
     } finally {
       setIsProcessing(false);
     }
   };
-  
     
   const handleDownload = async () => {
     if (!croppedImage) return;
@@ -217,80 +175,62 @@ const handleImageUpload = async (e) => {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error downloading image:', error);
-      setUploadProgress('下载失败，请重试');
-      
-      setTimeout(() => {
-        setUploadProgress('');
-      }, 3000);
+      setProcessingMessage('下载失败，请重试');
+
+         setTimeout(() => {
+             setProcessingMessage('');
+        }, 3000);
+
     }
   };
   
 
-const handleBackgroundChange = async (color) => {
-  if (!processedImage || !croppedImage) return;
-
-
-  try {
-    setIsProcessing(true);
-    setProcessingMessage('更换背景颜色...');
-    setUploadProgress('');
-    setBackgroundColor(color);
-
-
-    // 使用 cropperRef 重新裁剪
-    const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas({
-      // 使用与之前相同的裁剪设置
-      width: cropperRef.current.cropper.getCroppedCanvas().width,
-      height: cropperRef.current.cropper.getCroppedCanvas().height
-    });
-
-
-    // 在裁剪的 canvas 上添加背景色
-    const canvas = document.createElement('canvas');
-    canvas.width = croppedCanvas.width;
-    canvas.height = croppedCanvas.height;
-    const ctx = canvas.getContext('2d');
-
-
-    // 填充背景色
-    ctx.fillStyle = color;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-
-    // 绘制裁剪后的图像
-    ctx.drawImage(croppedCanvas, 0, 0);
-
-
-    // 生成新的图像
-    const newImageWithBackground = canvas.toDataURL('image/png');
+  const handleBackgroundChange = async (color) => {
+    if (!processedImage || !croppedImage) return;
+  
+    try {
+      setIsProcessing(true);
+      setProcessingMessage('更换背景颜色');
+      setBackgroundColor(color);
+  
+      // 使用 cropperRef 重新裁剪
+      const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas({
+        // 使用与之前相同的裁剪设置
+        width: cropperRef.current.cropper.getCroppedCanvas().width,
+        height: cropperRef.current.cropper.getCroppedCanvas().height
+      });
+  
+      // 在裁剪的 canvas 上添加背景色
+      const canvas = document.createElement('canvas');
+      canvas.width = croppedCanvas.width;
+      canvas.height = croppedCanvas.height;
+      const ctx = canvas.getContext('2d');
+  
+      // 填充背景色
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+      // 绘制裁剪后的图像
+      ctx.drawImage(croppedCanvas, 0, 0);
+  
+      // 生成新的图像
+      const newImageWithBackground = canvas.toDataURL('image/png');
+      
+      // 更新裁剪图像
+      setCroppedImage(newImageWithBackground);
     
-    // 更新裁剪图像
-    setCroppedImage(newImageWithBackground);
-    
-    setUploadProgress('');
-  } catch (error) {
-    console.error('Error changing background:', error);
-    setUploadProgress('背景更换失败,请重试');
-  } finally {
-    setIsProcessing(false);
-  }
-};
-  // ... in your JSX ... 
-{(croppedImage || processedImage || image) && (
-  <div className="preview-section">
-      <div className="preview-image">
-          <img 
-              key={Date.now()} 
-              src={croppedImage || processedImage || image}
-              alt="处理后的图像"
-              onError={(e) => {
-                  e.target.src = '';
-              }}
-              style={{ display: isProcessing && !(croppedImage || processedImage || image) ? 'none' : 'block' }}
-          />
-      </div>
-  </div>
-)}
+    } catch (error) {
+      console.error('Error changing background:', error);
+       setProcessingMessage('背景更换失败,请重试');
+
+         setTimeout(() => {
+             setProcessingMessage('');
+        }, 3000);
+
+    } finally {
+      setIsProcessing(false);
+    }
+  };
   
   return (
     <div className="app">
@@ -323,7 +263,9 @@ const handleBackgroundChange = async (color) => {
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
-            {isProcessing ? '处理中...' : '上传照片'}
+            <span >
+              {isProcessing ? '处理中' : '上传照片'}
+            </span>
           </button>
         </div>
         
@@ -339,7 +281,7 @@ const handleBackgroundChange = async (color) => {
           <div className={`processing-overlay ${isProcessing ? 'visible' : ''}`}>
             <div className="loading-spinner">
               <div className="spinner-circle"></div>
-              <div className="spinner-text">{processingMessage || uploadProgress}</div>
+              <div className="spinner-text">{processingMessage}</div>
             </div>
           </div>
           
@@ -356,21 +298,25 @@ const handleBackgroundChange = async (color) => {
               className="button button-primary"
               disabled={isProcessing}
             >
-              {isProcessing ? '处理中...' : '裁剪图片'}
+              <span >{isProcessing ? '处理中' : '裁剪图片'}</span>
             </button>
           </div>
 
-          {croppedImage && ( // Only render the img if croppedImage exists
-            <div className="preview-section">
-                <div className="preview-image">
-                  <img 
-                    key={croppedImage}
-                    src={croppedImage} 
-                    alt="Cropped" 
-                  />
-                </div>
-            </div>
-          )}
+            { (croppedImage || processedImage || image) && (
+              <div className="preview-section">
+                  <div className="preview-image">
+                      <img 
+                          key={imageKey} 
+                          src={croppedImage || processedImage || image}
+                          alt="处理后的图像"
+                          onError={(e) => {
+                              e.target.src = '';
+                          }}
+                          style={{ display: isProcessing && !(croppedImage || processedImage || image) ? 'none' : 'block' }}
+                      />
+                  </div>
+              </div>
+            )}
 
         </div>
       )}
@@ -383,6 +329,7 @@ const handleBackgroundChange = async (color) => {
               <button
                 key={color.value}
                 className={`color-button ${backgroundColor === color.value ? 'selected' : ''}`}
+                 data-color={color.name} // 添加 data-color 属性
                 style={{
                   backgroundColor: color.value,
                   color: color.name.startsWith('Light') || color.name === 'White' ? 'black' : 'white',
@@ -419,7 +366,7 @@ const handleBackgroundChange = async (color) => {
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            下载照片
+             下载照片
           </button>
         </div>
       )}

@@ -1,3 +1,19 @@
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1e40af;
+  --gray-100: #f9fafb;
+  --gray-200: #f3f4f6;
+  --gray-300: #e5e7eb;
+  --gray-400: #d1d5db;
+  --gray-500: #9ca3af;
+  --gray-600: #6b7280;
+  --gray-700: #4b5563;
+  --gray-800: #374151;
+  --gray-900: #1f2937;
+  --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
 .app {
   max-width: 1200px;
   margin: 0 auto;
@@ -77,6 +93,28 @@
 .upload-button.disabled {
   background-color: var(--gray-400);
   cursor: not-allowed;
+}
+
+
+.upload-button[disabled] span,
+.button[disabled] span {
+  animation: processingAnimation 2s steps(3, end) infinite;
+}
+
+
+@keyframes processingAnimation {
+  0% {
+    content: "处理中";
+  }
+  33% {
+    content: "处理中.";
+  }
+    66% {
+    content: "处理中..";
+  }
+  100% {
+    content: "处理中...";
+  }
 }
 
 .success-message {
