@@ -261,7 +261,7 @@ function App() {
                 className={`color-button ${backgroundColor === color.value ? 'selected' : ''}`}
                 style={{
                   backgroundColor: color.value,
-                  color: ['#ffffff', '#a6d8ff'].includes(color.value) ? '#1a1a1a' : 'white',
+                  color: color.name.startsWith('Light') || color.name === 'White' ? 'black' : 'white',
                 }}
                 onClick={() => handleBackgroundChange(color.value)}
                 disabled={isProcessing}
