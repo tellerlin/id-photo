@@ -11,6 +11,7 @@ function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [uploadStatus, setUploadStatus] = useState('');
+  const [processingMessage, setProcessingMessage] = useState('');
   const cropperRef = useRef(null);
   const [processedImage, setProcessedImage] = useState(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -43,7 +44,8 @@ const handleImageUpload = async (e) => {
           setProcessedImage(null);
           setCroppedImage(null);
           setIsProcessing(true);
-          setUploadProgress('正在处理图片...');
+          setProcessingMessage('正在处理图片...');
+          setUploadProgress('');
           setShowSuccessMessage(false);
 
 
@@ -90,7 +92,8 @@ const handleImageUpload = async (e) => {
                       setCroppedImage(finalDataURL);
 
 
-                      setUploadProgress('处理完成');
+                      setProcessingMessage('处理完成');
+                      setUploadProgress('');
                       setShowSuccessMessage(true);
 
 
@@ -125,7 +128,8 @@ const handleImageUpload = async (e) => {
 
       } catch (error) {
           console.error('图片处理错误:', error);
-          setUploadProgress(error.message || '处理失败');
+          setProcessingMessage(error.message || '处理失败');
+          setUploadProgress('');
           
           // 重置状态
           setImage(null);
@@ -178,7 +182,8 @@ const handleImageUpload = async (e) => {
   
     try {
       setIsProcessing(true);
-      setUploadProgress('正在裁剪图片...');
+      setProcessingMessage('正在裁剪图片...');
+      setUploadProgress('');
   
       const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas();
       const croppedImageDataURL = croppedCanvas.toDataURL('image/png');
@@ -227,7 +232,8 @@ const handleBackgroundChange = async (color) => {
 
   try {
     setIsProcessing(true);
-    setUploadProgress('更换背景颜色...');
+    setProcessingMessage('更换背景颜色...');
+    setUploadProgress('');
     setBackgroundColor(color);
 
 
@@ -278,13 +284,9 @@ const handleBackgroundChange = async (color) => {
               src={croppedImage || processedImage || image}
               alt="处理后的图像"
               onError={(e) => {
-                  console.error('Image load error', e);
-                  console.log('Problematic image data:', 
-                      croppedImage || processedImage || image
-                  );
-                  console.log('Current background color:', backgroundColor);
                   e.target.src = '';
               }}
+              style={{ display: isProcessing && !(croppedImage || processedImage || image) ? 'none' : 'block' }}
           />
       </div>
   </div>
@@ -337,7 +339,7 @@ const handleBackgroundChange = async (color) => {
           <div className={`processing-overlay ${isProcessing ? 'visible' : ''}`}>
             <div className="loading-spinner">
               <div className="spinner-circle"></div>
-              <div className="spinner-text">{uploadProgress}</div>
+              <div className="spinner-text">{processingMessage || uploadProgress}</div>
             </div>
           </div>
           
