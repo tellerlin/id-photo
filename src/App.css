@@ -86,19 +86,19 @@
 }
 
 .upload-button:hover:not(.disabled) {
-  background-color: var(--gray-800); /* 修改按钮 hover 背景色为深灰色 */
+  background-color: var(--gray-900); /* 修改按钮 hover 背景色为深灰色 */
   transform: translateY(-1px);
 }
 
 .upload-button.disabled {
-  background-color: var(--gray-400);
+  background-color: var(--gray-700);
   cursor: not-allowed;
 }
 
 .loading-button {
     position: relative;
     animation: processingAnimation 1.5s ease-in-out infinite;
-    background-color: var(--gray-800); /* 处理中时，按钮的背景色 */
+    background-color: var(--gray-900); /* 处理中时，按钮的背景色 */
 
 }
 
