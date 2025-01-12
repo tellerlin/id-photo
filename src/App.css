@@ -75,7 +75,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  background-color: var(--primary);
+  background-color: var(--gray-700); /* 修改按钮初始背景色为深灰色 */
   color: white;
   padding: 0.75rem 1.5rem;
   border-radius: 8px;
@@ -86,7 +86,7 @@
 }
 
 .upload-button:hover:not(.disabled) {
-  background-color: var(--primary-dark);
+  background-color: var(--gray-800); /* 修改按钮 hover 背景色为深灰色 */
   transform: translateY(-1px);
 }
 
@@ -95,27 +95,31 @@
   cursor: not-allowed;
 }
 
+.loading-button {
+    position: relative;
+    animation: processingAnimation 1.5s ease-in-out infinite;
+    background-color: var(--gray-800); /* 处理中时，按钮的背景色 */
 
-.upload-button[disabled] span,
-.button[disabled] span {
-  animation: processingAnimation 2s steps(3, end) infinite;
+}
+
+.loading-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.3); /* 半透明白色背景 */
+    border-radius: inherit; /* 继承按钮的圆角 */
 }
 
 
 @keyframes processingAnimation {
-  0% {
-    content: "处理中";
-  }
-  33% {
-    content: "处理中.";
-  }
-    66% {
-    content: "处理中..";
-  }
-  100% {
-    content: "处理中...";
-  }
+    0% { transform: scale(1); opacity: 1;}
+    50% { transform: scale(1.2); opacity: 0.8;}  /* 最大状态放大 20% */
+    100% { transform: scale(1);  opacity: 1;}
 }
+
 
 .success-message {
   position: absolute;

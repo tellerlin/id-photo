@@ -94,7 +94,7 @@ function App() {
                     }, 3000);
 
                     resolve();
-                    setIsProcessing(false); // 成功后才取消加载
+                  
                 };
 
 
@@ -128,7 +128,7 @@ function App() {
           setCroppedImage(null);
 
       }  finally {
-          //  setIsProcessing(false); // 确保加载状态在失败时也关闭，但是要放在resolve之后，处理成功了，才关闭加载动画。
+           setIsProcessing(false); // 确保加载状态在失败时也关闭
       }
     }
   };
@@ -181,6 +181,8 @@ function App() {
              setProcessingMessage('');
         }, 3000);
 
+    } finally {
+        setIsProcessing(false);
     }
   };
   
@@ -248,7 +250,7 @@ function App() {
             className="file-input"
             disabled={isProcessing}
           />
-          <button className={`upload-button ${isProcessing ? 'disabled' : ''}`}>
+          <button className={`upload-button ${isProcessing ? 'disabled' : ''} ${isProcessing ? 'loading-button' : ''}`}>
             <svg
               width="24"
               height="24"
@@ -263,9 +265,7 @@ function App() {
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
-            <span >
-              {isProcessing ? '处理中' : '上传照片'}
-            </span>
+             {isProcessing ? '处理中' : '上传照片'}
           </button>
         </div>
         
@@ -295,10 +295,10 @@ function App() {
             />
             <button 
               onClick={handleCrop} 
-              className="button button-primary"
+              className={`button button-primary ${isProcessing ? 'loading-button' : ''}`}
               disabled={isProcessing}
             >
-              <span >{isProcessing ? '处理中' : '裁剪图片'}</span>
+              {isProcessing ? '处理中' : '裁剪图片'}
             </button>
           </div>
 
@@ -348,7 +348,7 @@ function App() {
         <div style={{ textAlign: 'center', marginTop: '2rem' }}>
           <button 
             onClick={handleDownload} 
-            className="button button-primary"
+            className={`button button-primary ${isProcessing ? 'loading-button' : ''}`}
             disabled={isProcessing}
           >
             <svg
@@ -366,7 +366,7 @@ function App() {
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-             下载照片
+            下载照片
           </button>
         </div>
       )}
