@@ -1,3 +1,4 @@
+/* App.css */
 :root {
   --primary: #2563eb;
   --primary-dark: #1e40af;
@@ -146,30 +147,30 @@
 }
 
 .editor-container {
-  display: flex;
-  gap: 2rem;
-  margin-top: 2rem;
-  position: relative;
-  flex-direction: column;
+    display: flex;
+    gap: 2rem;
+    margin-top: 2rem;
+    position: relative;
+    flex-direction: column;
 }
 
 @media (min-width: 768px) {
-  .editor-container {
-    flex-direction: row;
-  }
-  
-  .cropper-section,
-  .preview-section {
-    width: 50%;
-  }
+    .editor-container {
+        flex-direction: row;
+    }
+    
+    .cropper-section,
+    .preview-section {
+        width: 50%;
+    }
 }
-
+  
 .cropper-section,
 .preview-section {
-  background: white;
-  padding: 1.5rem;
-  border-radius: 12px;
-  box-shadow: var(--shadow);
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
 }
 
 .preview-section {
