@@ -285,6 +285,27 @@
   border-color: var(--gray-200);
 }
 
+.color-button {
+  position: relative;
+  height: 48px;
+  border: 2px solid black; /* 为所有色块添加黑色边框 */
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  color: white; /* 默认白色字体 */
+}
+
+
+/* 对于light开头的颜色和白色，使用黑色字体 */
+.color-button[data-color^="light"],
+.color-button[data-color="white"] {
+  color: black;
+}
+
 .color-picker {
   position: absolute;
   inset: 0;
