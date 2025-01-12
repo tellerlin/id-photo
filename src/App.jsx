@@ -4,6 +4,7 @@ import Cropper from 'react-cropper';
 import { removeBackground } from '@imgly/background-removal';
 import 'cropperjs/dist/cropper.css';
 import './App.css';
+import outline from './assets/outline.png'; // 导入模板图片
 
 function App() {
     const [image, setImage] = useState(null);
@@ -15,6 +16,12 @@ function App() {
     const [processedImage, setProcessedImage] = useState(null);
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const [imageKey, setImageKey] = useState(0); // 用于图片 src 更新的 key
+    const [outlineStyle, setOutlineStyle] = useState({ // 新增 state
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+    })
 
     const presetColors = [
         { name: 'White', value: '#ffffff' },
@@ -235,6 +242,18 @@ function App() {
         }
       };
     
+      const handleCropMove = () => {
+        if (cropperRef.current && cropperRef.current.cropper) {
+            const cropBoxData = cropperRef.current.cropper.getCropBoxData();
+          setOutlineStyle({
+                top: cropBoxData.top,
+                left: cropBoxData.left,
+                width: cropBoxData.width,
+                height: cropBoxData.height,
+          })
+        }
+    };
+  
     return (
       <div className="app">
         <header className="header">
@@ -287,13 +306,46 @@ function App() {
             </div>
             
             <div className="cropper-section">
-              <Cropper
-                src={image}
-                style={{ height: 400, width: '100%' }}
-                aspectRatio={3 / 4}
-                guides={true}
-                ref={cropperRef}
-              />
+                <Cropper
+                    src={image}
+                    style={{ height: 400, width: '100%' }}
+                    aspectRatio={3 / 4}
+                    guides={true}
+                    ref={cropperRef}
+                    viewMode={1}
+                    zoomable={false} // 禁用缩放
+                    onCrop={handleCropMove}
+                  render={({ image, container, cropper }) => {
+                        return (
+                          <>
+                             <div
+                                ref={container}
+                                style={{ position: 'relative' }}
+                              >
+                                {image}
+                                  <div
+                                     ref={cropper}
+                                     style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%'}}
+                                     className='cropper-container'
+                                   >
+                                    <div className='cropper-view-box'>
+                                         <img 
+                                           src={outline} 
+                                           alt="Outline"
+                                           style={{
+                                              position: 'absolute',
+                                              ...outlineStyle,
+                                            pointerEvents: 'none',
+                                            opacity: 0.5,
+                                            }}
+                                        />
+                                      </div>
+                                  </div>
+                              </div>
+                          </>
+                        )
+                      }}
+                 />
               <button 
                 onClick={handleCrop} 
                 className={`button button-primary ${isProcessing ? 'loading-button' : ''}`}
