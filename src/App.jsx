@@ -5,7 +5,6 @@ import 'cropperjs/dist/cropper.css';
 import './App.css';
 import outline from './assets/outline.png';
 
-
 function App() {
     const [image, setImage] = useState(null);
     const [croppedImage, setCroppedImage] = useState(null);
@@ -21,13 +20,13 @@ function App() {
     const presetColors = [
         { name: 'White', value: '#ffffff' },
         { name: 'Red', value: '#ff0000' },
-        { name: 'Blue', value: '#0000ff' },  // 或者 '#4285F4'
-       { name: 'Bright Blue', value: '#4285F4' },
-        { name: 'Light Blue', value: '#add8e6' }, // 或者 '#87CEEB'
-       { name: 'Sky Blue', value: '#87ceeb' },
-        { name: 'Navy Blue', value: '#000080' },  // 或者 '#191970'
-        { name: 'Gray', value: '#808080' },  // 或者 '#D3D3D3'
-         { name: 'Light Gray', value: '#d3d3d3' },
+        { name: 'Blue', value: '#0000ff' },
+        { name: 'Bright Blue', value: '#4285F4' },
+        { name: 'Light Blue', value: '#add8e6' },
+        { name: 'Sky Blue', value: '#87ceeb' },
+        { name: 'Navy Blue', value: '#000080' },
+        { name: 'Gray', value: '#808080' },
+        { name: 'Light Gray', value: '#d3d3d3' },
     ];
 
     useEffect(() => {
@@ -35,6 +34,94 @@ function App() {
             setCroppedImage(processedImage);
         }
     }, [processedImage]);
+
+
+     const intelligentCrop = (image) => {
+        const aspectRatio = 3 / 4;
+        const width = image.naturalWidth;
+        const height = image.naturalHeight;
+
+        // 策略1: 根据宽高比智能裁剪
+        const calculateOptimalCrop = () => {
+            if (width / height > aspectRatio) {
+                const newWidth = height * aspectRatio;
+                const startX = (width - newWidth) / 2;
+                
+                return {
+                    left: startX,
+                    top: 0,
+                    width: newWidth,
+                    height: height
+                };
+            } else {
+                const newHeight = width / aspectRatio;
+                const startY = (height - newHeight) / 2;
+                
+                return {
+                    left: 0,
+                    top: startY,
+                    width: width,
+                    height: newHeight
+                };
+            }
+        };
+
+        // 策略2: 边缘检测裁剪
+        const edgeDetectionCrop = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = width;
+            canvas.height = height;
+            
+            ctx.drawImage(image, 0, 0);
+            const imageData = ctx.getImageData(0, 0, width, height);
+            const data = imageData.data;
+            
+            let minX = width, maxX = 0;
+            let minY = height, maxY = 0;
+            
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const index = (y * width + x) * 4;
+                    const alpha = data[index + 3];
+                    
+                    if (alpha > 10) {
+                        minX = Math.min(minX, x);
+                        maxX = Math.max(maxX, x);
+                        minY = Math.min(minY, y);
+                        maxY = Math.max(maxY, y);
+                    }
+                }
+            }
+            
+            const paddingX = Math.floor((maxX - minX) * 0.1);
+            const paddingY = Math.floor((maxY - minY) * 0.1);
+            
+            return {
+                left: Math.max(0, minX - paddingX),
+                top: Math.max(0, minY - paddingY),
+                width: Math.min(width, maxX - minX + 2 * paddingX),
+                height: Math.min(height, maxY - minY + 2 * paddingY)
+            };
+        };
+
+        // 尝试多种裁剪策略
+        const strategies = [edgeDetectionCrop, calculateOptimalCrop];
+        
+        for (let strategy of strategies) {
+            const result = strategy();
+            if (result) return result;
+        }
+
+        // 兜底：中心裁剪
+        return {
+            left: width * 0.25,
+            top: height * 0.2,
+            width: width * 0.5,
+            height: height * 0.6
+        };
+    };
+
 
     const handleImageUpload = async (e) => {
         const file = e.target.files[0];
@@ -56,9 +143,9 @@ function App() {
             }
 
             const blob = await removeBackground(file);
-             if (!blob) {
+            if (!blob) {
                   throw new Error('Background removal failed.');
-             }
+            }
             const reader = new FileReader();
 
             return new Promise((resolve, reject) => {
@@ -79,6 +166,14 @@ function App() {
                         setProcessedImage(finalDataURL);
                         setImage(finalDataURL);
                          setCroppedImage(finalDataURL);
+
+                         setTimeout(() => {
+                            if (cropperRef.current?.cropper) {
+                                const autoCropData = intelligentCrop(img);
+                                cropperRef.current.cropper.setCropBoxData(autoCropData);
+                            }
+                        }, 100);
+
                         setProcessingMessage('Processing complete');
                         setShowSuccessMessage(true);
 
@@ -116,7 +211,6 @@ function App() {
             setIsProcessing(false);
         }
     };
-
 
     const handleCropChange = () => {
         if (!cropperRef.current?.cropper || !processedImage) return;
@@ -190,14 +284,12 @@ function App() {
         }
     };
 
-
     return (
         <div className="app">
             <header className="header">
                 <h1>ID Photo Generator</h1>
                 <p>Create professional ID photos with automatic background removal</p>
             </header>
-           
 
             <div className="process-steps">
                 <div className={`process-step ${image ? 'completed' : 'active'}`}>
@@ -276,7 +368,7 @@ function App() {
                 )}
             </div>
 
-            {image && (
+             {image && (
                 <div className="editor-container">
                     <div className={`processing-overlay ${isProcessing ? 'visible' : ''}`}>
                         <div className="loading-spinner">
@@ -295,8 +387,10 @@ function App() {
                             zoomable={false}
                             zoomOnWheel={false}
                             crop={handleCropChange}
-                            minCropBoxWidth={100}  // 设置最小宽度
-                            minCropBoxHeight={100} // 设置最小高度
+                            minCropBoxWidth={100}
+                            minCropBoxHeight={100}
+                           autoCropArea={0.6}  // 默认裁剪区域占比
+                           viewMode={1}
                         />
                     </div>
 
@@ -315,7 +409,7 @@ function App() {
                             </div>
                         )}
                     </div>
-
+                     
                     { (croppedImage || processedImage || image) && (
                         <div className="preview-section">
                             <div className="image-container"> 
@@ -358,7 +452,7 @@ function App() {
                 </div>
             )}
             
-            {croppedImage && (
+             {croppedImage && (
                 <div style={{ textAlign: 'center', marginTop: '2rem' }}>
                     <button 
                         onClick={handleDownload} 
