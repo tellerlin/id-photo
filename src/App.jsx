@@ -33,94 +33,120 @@ function App() {
 
     // 智能裁剪函数
     const intelligentCrop = (img) => {
-        console.group('Intelligent Crop Detailed Analysis');
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.drawImage(img, 0, 0);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
     
     
-        // 图像基本信息
-        console.log('Image Original Details:', {
-            naturalWidth: img.naturalWidth,
-            naturalHeight: img.naturalHeight,
-            aspectRatio: img.naturalWidth / img.naturalHeight
+        // 检测有效区域
+        let topY = canvas.height, 
+            bottomY = 0, 
+            leftX = canvas.width, 
+            rightX = 0;
+    
+    
+        // 存储每一行的有效像素宽度
+        const rowWidths = [];
+    
+    
+        for (let y = 0; y < canvas.height; y++) {
+            let rowLeftX = canvas.width;
+            let rowRightX = 0;
+    
+    
+            for (let x = 0; x < canvas.width; x++) {
+                const index = (y * canvas.width + x) * 4;
+                const alpha = data[index + 3];
+                
+                if (alpha > 10) {
+                    // 更新总体有效区域
+                    topY = Math.min(topY, y);
+                    bottomY = Math.max(bottomY, y);
+                    leftX = Math.min(leftX, x);
+                    rightX = Math.max(rightX, x);
+    
+    
+                    // 更新当前行的有效区域
+                    rowLeftX = Math.min(rowLeftX, x);
+                    rowRightX = Math.max(rowRightX, x);
+                }
+            }
+    
+    
+            // 记录当前行的宽度
+            rowWidths.push(rowRightX - rowLeftX);
+        }
+    
+    
+        // 分析宽度变化率
+        const widthChanges = [];
+        for (let i = 1; i < rowWidths.length; i++) {
+            const changeRate = (rowWidths[i] - rowWidths[i-1]) / rowWidths[i-1];
+            widthChanges.push(changeRate);
+        }
+    
+    
+        // 找到宽度变化最显著的区域
+        let headEndY = topY;
+        let shoulderEndY = bottomY;
+        let maxWidthChangeIndex = -1;
+        let maxWidthChange = 0;
+    
+    
+        widthChanges.forEach((change, index) => {
+            if (change > maxWidthChange) {
+                maxWidthChange = change;
+                maxWidthChangeIndex = index;
+            }
         });
     
     
-        // 人体区域信息（假设已知）
-        const personArea = {
-            top: 114,    
-            bottom: 1571,
-            left: 99,
-            right: 1215,
-            width: 1116,
-            height: 1457
-        };
+        // 头部和肩部的大致位置
+        if (maxWidthChangeIndex !== -1) {
+            headEndY = topY + maxWidthChangeIndex;
+            // 假设肩部在头部下方一定范围内
+            shoulderEndY = Math.min(bottomY, headEndY + (bottomY - topY) * 0.3);
+        }
     
     
-        // 人体区域比例分析
-        const personAreaRatio = {
-            verticalPosition: personArea.top / img.naturalHeight,
-            horizontalPosition: personArea.left / img.naturalWidth,
-            personHeightRatio: (personArea.bottom - personArea.top) / img.naturalHeight
-        };
-        console.log('Person Area Ratio:', personAreaRatio);
-    
-    
-        // 证件照比例配置
-        const PHOTO_RATIOS = {
-            '3:4': { width: 3, height: 4 },
-            '2:3': { width: 2, height: 3 },
-            '4:5': { width: 4, height: 5 }
-        };
-    
-    
-        // 选择比例策略
-        const selectedRatio = PHOTO_RATIOS['3:4'];
-        const targetRatio = selectedRatio.width / selectedRatio.height;
-    
-    
-        // 动态计算裁剪尺寸策略
-        const recommendedWidth = img.naturalWidth * 0.6; // 原图60%宽度
-        const recommendedHeight = recommendedWidth / targetRatio;
-    
-    
-        // 垂直位置优化
-        // 调整人体垂直位置，避免上下留白过多
-        const verticalOffset = personArea.top + (personArea.height * 0.25); // 调整为25%
-    
-    
-        // 水平居中计算
-        const horizontalOffset = (img.naturalWidth - recommendedWidth) / 2;
+        // 裁剪框计算
+        const personWidth = rightX - leftX;
+        const recommendedWidth = personWidth * 0.7;  // 取70%宽度
+        const recommendedHeight = recommendedWidth * (4/3);  // 3:4比例
     
     
         const cropData = {
-            left: horizontalOffset,
-            top: verticalOffset,
+            left: leftX + (personWidth - recommendedWidth) / 2,
+            top: headEndY,
             width: recommendedWidth,
             height: recommendedHeight
         };
     
     
         // 安全边界检查
-        cropData.left = Math.max(0, Math.min(cropData.left, img.naturalWidth - cropData.width));
-        cropData.top = Math.max(0, Math.min(cropData.top, img.naturalHeight - cropData.height));
+        cropData.left = Math.max(0, Math.min(cropData.left, img.width - cropData.width));
+        cropData.top = Math.max(0, Math.min(cropData.top, img.height - cropData.height));
     
     
-        // 详细日志输出
-        console.log('Recommended Crop Configuration:', {
-            ratioUsed: `${selectedRatio.width}:${selectedRatio.height}`,
-            cropDetails: cropData,
-            safetyChecks: {
-                withinImageWidth: cropData.left + cropData.width <= img.naturalWidth,
-                withinImageHeight: cropData.top + cropData.height <= img.naturalHeight
-            }
+        console.log('Intelligent Crop Analysis:', {
+            headEndY,
+            shoulderEndY,
+            widthChanges: {
+                maxChange: maxWidthChange,
+                maxChangeIndex: maxWidthChangeIndex
+            },
+            cropData
         });
-    
-    
-        console.groupEnd();
     
     
         return cropData;
     };
-
 
     const handleImageUpload = async (e) => {
         const file = e.target.files[0];
