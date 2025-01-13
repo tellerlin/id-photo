@@ -3,6 +3,8 @@ import Cropper from 'react-cropper';
 import { removeBackground } from '@imgly/background-removal';
 import 'cropperjs/dist/cropper.css';
 import './App.css';
+import outline from './assets/outline.png';
+
 
 function App() {
     const [image, setImage] = useState(null);
@@ -243,7 +245,7 @@ function App() {
                         <Cropper
                             src={image}
                             style={{ height: 400, width: '100%' }}
-                            aspectRatio={1/1}
+                            aspectRatio={3 / 4} // 设置 3:4 的比例
                             guides={true}
                             ref={cropperRef}
                             zoomable={false}
@@ -262,7 +264,7 @@ function App() {
                                     style={{ display: isProcessing && !correctionImage ? 'none' : 'block' }}
                                 />
                                   <div className="correction-overlay">
-                                        <img src="/outline.png" alt="Outline" style={{ opacity: 0.5 }} />
+                                        <img src={outline} alt="Outline" style={{ opacity: 0.5 }} />
                                   </div>
                             </div>
                         )}
