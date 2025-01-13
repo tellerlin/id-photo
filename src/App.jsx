@@ -36,89 +36,67 @@ function App() {
     }, [processedImage]);
 
 
-     const intelligentCrop = (image) => {
+    const intelligentCrop = (image) => {
         const aspectRatio = 3 / 4;
         const width = image.naturalWidth;
         const height = image.naturalHeight;
 
-        // 策略1: 根据宽高比智能裁剪
-        const calculateOptimalCrop = () => {
-            if (width / height > aspectRatio) {
-                const newWidth = height * aspectRatio;
-                const startX = (width - newWidth) / 2;
-                
-                return {
-                    left: startX,
-                    top: 0,
-                    width: newWidth,
-                    height: height
-                };
-            } else {
-                const newHeight = width / aspectRatio;
-                const startY = (height - newHeight) / 2;
-                
-                return {
-                    left: 0,
-                    top: startY,
-                    width: width,
-                    height: newHeight
-                };
-            }
-        };
+        // 创建canvas分析图像
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(image, 0, 0);
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = imageData.data;
 
-        // 策略2: 边缘检测裁剪
-        const edgeDetectionCrop = () => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = width;
-            canvas.height = height;
-            
-            ctx.drawImage(image, 0, 0);
-            const imageData = ctx.getImageData(0, 0, width, height);
-            const data = imageData.data;
-            
-            let minX = width, maxX = 0;
-            let minY = height, maxY = 0;
-            
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const index = (y * width + x) * 4;
-                    const alpha = data[index + 3];
-                    
-                    if (alpha > 10) {
-                        minX = Math.min(minX, x);
-                        maxX = Math.max(maxX, x);
-                        minY = Math.min(minY, y);
-                        maxY = Math.max(maxY, y);
-                    }
+        // 1. 检测头部顶部位置
+        let headTop = height;
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = (y * width + x) * 4;
+                const alpha = data[index + 3];
+                if (alpha > 10) {
+                    headTop = y;
+                    break;
                 }
             }
-            
-            const paddingX = Math.floor((maxX - minX) * 0.1);
-            const paddingY = Math.floor((maxY - minY) * 0.1);
-            
-            return {
-                left: Math.max(0, minX - paddingX),
-                top: Math.max(0, minY - paddingY),
-                width: Math.min(width, maxX - minX + 2 * paddingX),
-                height: Math.min(height, maxY - minY + 2 * paddingY)
-            };
-        };
-
-        // 尝试多种裁剪策略
-        const strategies = [edgeDetectionCrop, calculateOptimalCrop];
-        
-        for (let strategy of strategies) {
-            const result = strategy();
-            if (result) return result;
+            if (headTop !== height) break;
         }
 
-        // 兜底：中心裁剪
+        // 2. 检测肩部底部位置
+        let shoulderBottom = 0;
+        for (let y = height - 1; y >= 0; y--) {
+            for (let x = 0; x < width; x++) {
+                const index = (y * width + x) * 4;
+                const alpha = data[index + 3];
+                if (alpha > 10) {
+                    shoulderBottom = y;
+                    break;
+                }
+            }
+            if (shoulderBottom !== 0) break;
+        }
+
+        // 3. 计算头部高度
+        const headHeight = shoulderBottom - headTop;
+        
+        // 4. 计算裁剪框高度（头部高度 + 上下各10%留白）
+        const cropHeight = headHeight * 1.2;
+        
+        // 5. 根据宽高比计算裁剪框宽度
+        const cropWidth = cropHeight * aspectRatio;
+        
+        // 6. 计算裁剪框位置
+        const cropTop = Math.max(0, headTop - headHeight * 0.1);
+        const cropBottom = Math.min(height, shoulderBottom + headHeight * 0.1);
+        const cropLeft = Math.max(0, (width - cropWidth) / 2);
+        
         return {
-            left: width * 0.25,
-            top: height * 0.2,
-            width: width * 0.5,
-            height: height * 0.6
+            left: cropLeft,
+            top: cropTop,
+            width: cropWidth,
+            height: cropHeight
         };
     };
 
@@ -380,7 +358,7 @@ function App() {
                      <div className="cropper-section">
                         <Cropper
                             src={image}
-                            style={{ height: 400, width: '100%' }}
+                            style={{ height: 400, width: 300 }}
                             aspectRatio={3 / 4}
                             guides={true}
                             ref={cropperRef}
