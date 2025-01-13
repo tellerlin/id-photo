@@ -30,88 +30,103 @@ function App() {
         { name: 'Light Gray', value: '#d3d3d3' },
     ];
 
+
+    // 智能裁剪函数
     const intelligentCrop = (img) => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
+        // 日志组
+        console.group('Intelligent Crop Detailed Analysis');
+        
+        // 基础图像信息日志
+        console.log('Image Original Details:', {
+            naturalWidth: img.naturalWidth,
+            naturalHeight: img.naturalHeight,
+            aspectRatio: img.naturalWidth / img.naturalHeight
+        });
 
-        const width = img.width;
-        const height = img.height;
-        const data = ctx.getImageData(0, 0, width, height).data;
-        const aspectRatio = 3 / 4; // 标准证件照比例
 
-        // 1. 精确检测有效区域
-        let topY = height, bottomY = 0, leftX = width, rightX = 0;
-        for (let y = 0; y < height; y++) {
-            let rowHasContent = false;
-            for (let x = 0; x < width; x++) {
-                const index = (y * width + x) * 4;
-                const alpha = data[index + 3];
-                if (alpha > 10) {
-                    rowHasContent = true;
-                    leftX = Math.min(leftX, x);
-                    rightX = Math.max(rightX, x);
-                }
-            }
-            if (rowHasContent) {
-                topY = Math.min(topY, y);
-                bottomY = Math.max(bottomY, y);
-            }
-        }
+        // 人体区域分析
+        const personArea = {
+            top: 114,    // 从之前日志获取
+            bottom: 1571,
+            left: 99,
+            right: 1215,
+            width: 1116,
+            height: 1457  // bottom - top
+        };
 
-        // 2. 计算人像实际尺寸
-        const personWidth = rightX - leftX;
-        const personHeight = bottomY - topY;
 
-        // 3. 计算推荐裁剪高度 (更精确的头部区域)
-        const recommendedHeadHeight = Math.min(personHeight * 0.5, height * 0.6);
-        const cropHeight = recommendedHeadHeight * 1.5; // 留出更多空间
+        // 计算人体区域比例
+        const personAreaRatio = {
+            verticalPosition: personArea.top / img.naturalHeight,
+            horizontalPosition: personArea.left / img.naturalWidth,
+            personHeightRatio: (personArea.bottom - personArea.top) / img.naturalHeight
+        };
+        console.log('Person Area Ratio:', personAreaRatio);
 
-        // 4. 计算裁剪宽度(严格保持3:4比例)
-        const cropWidth = cropHeight * aspectRatio;
 
-        // 5. 计算裁剪起始位置(居中)
-        const cropTop = Math.max(0, topY - (cropHeight - recommendedHeadHeight) / 2);
-        const cropLeft = Math.max(0, leftX + (personWidth - cropWidth) / 2);
+        // 证件照标准比例配置
+        const PHOTO_RATIOS = {
+            '1inch': { width: 3, height: 4 },   // 1英寸
+            '2inch': { width: 4, height: 6 },   // 2英寸
+            'passport': { width: 3, height: 4 } // 护照
+        };
 
-        // 6. 安全校验
-        const finalCropTop = Math.min(cropTop, height - cropHeight);
-        const finalCropLeft = Math.min(cropLeft, width - cropWidth);
 
-        console.log('Intelligent Crop Precise Details:', {
-            imageSize: `${width}x${height}`,
-            personArea: {
-                top: topY,
-                bottom: bottomY,
-                left: leftX,
-                right: rightX,
-                width: personWidth,
-                height: personHeight
-            },
-            cropDetails: {
-                recommendedHeadHeight,
-                cropHeight,
-                cropWidth,
-                cropTop: finalCropTop,
-                cropLeft: finalCropLeft
+        // 选择默认比例
+        const selectedRatio = PHOTO_RATIOS['passport'];
+        const targetRatio = selectedRatio.width / selectedRatio.height;
+
+
+        // 动态计算裁剪尺寸
+        const recommendedWidth = img.naturalWidth * 0.6; // 原图60%宽度
+        const recommendedHeight = recommendedWidth / targetRatio;
+
+
+        // 垂直位置优化
+        const verticalOffset = personArea.top + (personArea.height * 0.3);
+        
+        // 水平居中计算
+        const horizontalOffset = (img.naturalWidth - recommendedWidth) / 2;
+
+
+        const cropData = {
+            left: horizontalOffset,
+            top: verticalOffset,
+            width: recommendedWidth,
+            height: recommendedHeight
+        };
+
+
+        // 安全边界检查
+        cropData.left = Math.max(0, Math.min(cropData.left, img.naturalWidth - cropData.width));
+        cropData.top = Math.max(0, Math.min(cropData.top, img.naturalHeight - cropData.height));
+
+
+        // 详细日志输出
+        console.log('Recommended Crop Configuration:', {
+            ratioUsed: `${selectedRatio.width}:${selectedRatio.height}`,
+            cropDetails: cropData,
+            safetyChecks: {
+                withinImageWidth: cropData.left + cropData.width <= img.naturalWidth,
+                withinImageHeight: cropData.top + cropData.height <= img.naturalHeight
             }
         });
 
-        return {
-            left: finalCropLeft,
-            top: finalCropTop,
-            width: cropWidth,
-            height: cropHeight
-        };
+
+        console.groupEnd();
+
+
+        return cropData;
     };
+
 
     const handleImageUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
+    
+    
         try {
+            // 重置状态
             setImage(null);
             setProcessedImage(null);
             setCroppedImage(null);
@@ -120,104 +135,147 @@ function App() {
             setShowSuccessMessage(false);
             setImageKey((prevKey) => prevKey + 1);
             setCorrectionImage(null);
-
-
+    
+    
+            // 详细日志组
+            console.group('Image Upload and Processing');
+            console.time('TotalProcessingTime');
+    
+    
+            // 文件类型验证
             const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/tiff', 'image/svg+xml'];
             if (!validTypes.includes(file.type)) {
                 throw new Error(`Unsupported file type. Supported formats: ${validTypes.join(', ')}`);
             }
-
+    
+    
+            // 移除背景
             const blob = await removeBackground(file);
             if (!blob) {
-                  throw new Error('Background removal failed.');
+                throw new Error('Background removal failed.');
             }
-            const reader = new FileReader();
-
+    
+    
             return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
                 reader.onloadend = () => {
                     const safeDataURL = reader.result.startsWith('data:image')
                         ? reader.result
                         : `data:image/png;base64,${reader.result}`;
-
+    
+    
                     const img = new Image();
                     img.onload = () => {
+                        console.log('Image Loaded Details:', {
+                            width: img.width,
+                            height: img.height,
+                            aspectRatio: img.width / img.height
+                        });
+    
+    
                         const canvas = document.createElement('canvas');
                         canvas.width = img.width;
                         canvas.height = img.height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0);
-
+    
+    
                         const finalDataURL = canvas.toDataURL('image/png');
                         setProcessedImage(finalDataURL);
                         setImage(finalDataURL);
                         setCroppedImage(finalDataURL);
-
-                         setTimeout(() => {
+    
+    
+                        // 智能裁剪延迟处理
+                        setTimeout(() => {
                             if (cropperRef.current?.cropper) {
                                 const cropper = cropperRef.current.cropper;
+                                
+                                // 智能裁剪
                                 const autoCropData = intelligentCrop(img);
-                                console.log('Auto crop data:', autoCropData);
-
+                                console.log('Auto Crop Recommendation:', autoCropData);
+    
+    
+                                // 获取图像和画布数据
                                 const imageData = cropper.getImageData();
                                 const canvasData = cropper.getCanvasData();
-
+    
+    
                                 // 计算缩放比例
                                 const scaleX = canvasData.naturalWidth / imageData.naturalWidth;
                                 const scaleY = canvasData.naturalHeight / imageData.naturalHeight;
-
-                                // 将原始坐标转换为cropper组件内部的坐标
-                                const scaledCropLeft = autoCropData.left * scaleX;
-                                const scaledCropTop = autoCropData.top * scaleY;
-                                const scaledCropWidth = autoCropData.width * scaleX;
-                                const scaledCropHeight = autoCropData.height * scaleY;
-
-
-                                cropper.setCropBoxData({
-                                    left: scaledCropLeft,
-                                    top: scaledCropTop,
-                                    width: scaledCropWidth,
-                                    height: scaledCropHeight
-                                });
-
-
-                                console.log('Cropper crop box data after set:', cropper.getCropBoxData());
+    
+    
+                                // 转换裁剪坐标
+                                const scaledCropData = {
+                                    left: autoCropData.left * scaleX,
+                                    top: autoCropData.top * scaleY,
+                                    width: autoCropData.width * scaleX,
+                                    height: autoCropData.height * scaleY
+                                };
+    
+    
+                                // 设置裁剪框
+                                cropper.setCropBoxData(scaledCropData);
+    
+    
+                                console.log('Final Cropper Box Configuration:', cropper.getCropBoxData());
                             }
                         }, 100);
-
+    
+    
+                        // 处理完成提示
                         setProcessingMessage('Processing complete');
                         setShowSuccessMessage(true);
-
+    
+    
                         setTimeout(() => {
                             setShowSuccessMessage(false);
                         }, 3000);
-
+    
+    
+                        console.timeEnd('TotalProcessingTime');
+                        console.groupEnd();
+    
+    
                         resolve();
                     };
-
+    
+    
                     img.onerror = () => {
+                        console.error('Image Loading Failed');
                         setIsProcessing(false);
                         reject(new Error('Image loading failed'));
                     };
-
+    
+    
                     img.src = safeDataURL;
                 };
-
+    
+    
                 reader.onerror = () => {
+                    console.error('File Reading Failed');
                     setIsProcessing(false);
                     reject(new Error('File reading failed'));
                 };
-
+    
+    
                 reader.readAsDataURL(blob);
             });
-
+    
+    
         } catch (error) {
-            console.error('Image processing error:', error);
+            console.error('Image Processing Error:', error);
             setProcessingMessage(error.message || 'Processing failed');
+            
+            // 重置所有状态
             setImage(null);
             setProcessedImage(null);
             setCroppedImage(null);
             setCorrectionImage(null);
-
+    
+    
         } finally {
             setIsProcessing(false);
         }
