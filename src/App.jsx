@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Cropper from 'react-cropper';
 import 'cropperjs/dist/cropper.css';
 import './App.css';
 import outline from './assets/outline.png';
+import { removeBackground } from '@imgly/background-removal';
 
 function App() {
     const [image, setImage] = useState(null);
@@ -14,9 +15,21 @@ function App() {
     const [processingMessage, setProcessingMessage] = useState('');
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const [imageKey, setImageKey] = useState(0);
-
-
     const cropperRef = useRef(null);
+
+
+    const presetColors = [
+        { name: 'White', value: '#ffffff' },
+        { name: 'Red', value: '#ff0000' },
+        { name: 'Blue', value: '#0000ff' },
+        { name: 'Bright Blue', value: '#4285F4' },
+        { name: 'Light Blue', value: '#add8e6' },
+        { name: 'Sky Blue', value: '#87ceeb' },
+        { name: 'Navy Blue', value: '#000080' },
+        { name: 'Gray', value: '#808080' },
+        { name: 'Light Gray', value: '#d3d3d3' },
+    ];
+
     const intelligentCrop = (img) => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
@@ -109,6 +122,15 @@ function App() {
             setCorrectionImage(null);
 
 
+            const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/tiff', 'image/svg+xml'];
+            if (!validTypes.includes(file.type)) {
+                throw new Error(`Unsupported file type. Supported formats: ${validTypes.join(', ')}`);
+            }
+
+            const blob = await removeBackground(file);
+            if (!blob) {
+                  throw new Error('Background removal failed.');
+            }
             const reader = new FileReader();
 
             return new Promise((resolve, reject) => {
@@ -130,7 +152,7 @@ function App() {
                         setImage(finalDataURL);
                         setCroppedImage(finalDataURL);
 
-                        setTimeout(() => {
+                         setTimeout(() => {
                             if (cropperRef.current?.cropper) {
                                 const cropper = cropperRef.current.cropper;
                                 const autoCropData = intelligentCrop(img);
@@ -185,7 +207,7 @@ function App() {
                     reject(new Error('File reading failed'));
                 };
 
-                reader.readAsDataURL(file);
+                reader.readAsDataURL(blob);
             });
 
         } catch (error) {
@@ -206,16 +228,25 @@ function App() {
         if (!cropperRef.current?.cropper || !image) return;
 
         try {
-            const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas();
+             const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas();
             const croppedImageDataURL = croppedCanvas.toDataURL('image/png');
             setCroppedImage(croppedImageDataURL);
-            setCorrectionImage(croppedImageDataURL);
-
+           
+            // 生成无背景图，用于outline
+            const img = new Image();
+            img.onload = () => {
+               const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                setCorrectionImage(canvas.toDataURL('image/png'));
+            };
+           img.src=croppedImageDataURL;
         } catch (error) {
             console.error('Error updating preview:', error);
         }
     };
-
 
     const handleDownload = async () => {
         if (!croppedImage) return;
@@ -243,82 +274,68 @@ function App() {
 
     const handleBackgroundChange = async (color) => {
         if (!image || !cropperRef.current?.cropper) return;
+    
+    
         try {
             setIsProcessing(true);
             setProcessingMessage('Changing background color');
             setBackgroundColor(color);
-
+            
             const cropper = cropperRef.current.cropper;
+            // 获取当前完整的裁剪画布
             const croppedCanvas = cropper.getCroppedCanvas({
-                width: cropper.getCroppedCanvas().width,
-                height: cropper.getCroppedCanvas().height
+                // 明确指定与原始图像相同的宽高
+                width: cropper.getImageData().naturalWidth,
+                height: cropper.getImageData().naturalHeight
             });
-           
+    
+    
             const canvas = document.createElement('canvas');
-            canvas.width = croppedCanvas.width;
-            canvas.height = croppedCanvas.height;
+            canvas.width = croppedCanvas.width;  // 保持原始宽度
+            canvas.height = croppedCanvas.height;  // 保持原始高度
             const ctx = canvas.getContext('2d');
-
+    
+    
+            // 用指定颜色填充完整背景
             ctx.fillStyle = color;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制完整的裁剪图像
             ctx.drawImage(croppedCanvas, 0, 0);
-
-            const newImageWithBackground = canvas.toDataURL('image/png');
-             setCorrectionImage(newImageWithBackground);
-            setCroppedImage(newImageWithBackground);
-             
-            // 重新计算裁剪框位置
-            const img = new Image();
-            img.onload = () => {
-                const autoCropData = intelligentCrop(img);
-                const imageData = cropper.getImageData();
-                const canvasData = cropper.getCanvasData();
-                const scaleX = canvasData.naturalWidth / imageData.naturalWidth;
-                const scaleY = canvasData.naturalHeight / imageData.naturalHeight;
-                const scaledCropLeft = autoCropData.left * scaleX;
-                const scaledCropTop = autoCropData.top * scaleY;
-                const scaledCropWidth = autoCropData.width * scaleX;
-                const scaledCropHeight = autoCropData.height * scaleY;
-
-                cropper.setCropBoxData({
-                    left: scaledCropLeft,
-                    top: scaledCropTop,
-                    width: scaledCropWidth,
-                    height: scaledCropHeight
-                });
-            };
-            img.src = newImageWithBackground;
-        } catch (error) {
-            console.error('Error changing background:', error);
-            setProcessingMessage('Failed to change background, please try again');
+    
+    
+            // 将新画布转换为数据URL
+            const newImageDataURL = canvas.toDataURL('image/png');
+            
+            // 更新图像，保持原始大小
+            setProcessedImage(newImageDataURL);
+             // 更新 croppedImage 以便预览
+            setCroppedImage(newImageDataURL);
+    
+    
+            setProcessingMessage('Processing complete');
+            setShowSuccessMessage(true);
+    
+    
             setTimeout(() => {
-                setProcessingMessage('');
+                setShowSuccessMessage(false);
             }, 3000);
+    
+    
+        } catch (error) {
+            console.error('Background change error:', error);
         } finally {
             setIsProcessing(false);
         }
     };
 
-
-    const presetColors = [
-        { name: 'White', value: '#ffffff' },
-        { name: 'Red', value: '#ff0000' },
-        { name: 'Blue', value: '#0000ff' },
-        { name: 'Bright Blue', value: '#4285F4' },
-        { name: 'Light Blue', value: '#add8e6' },
-        { name: 'Sky Blue', value: '#87ceeb' },
-        { name: 'Navy Blue', value: '#000080' },
-        { name: 'Gray', value: '#808080' },
-        { name: 'Light Gray', value: '#d3d3d3' },
-    ];
-
     return (
         <div className="app">
-             <header className="header">
+           <header className="header">
                 <h1>ID Photo Generator</h1>
                 <p>Create professional ID photos with automatic background removal</p>
             </header>
-            <div className="process-steps">
+           <div className="process-steps">
                 <div className={`process-step ${image ? 'completed' : 'active'}`}>
                     <div className="process-step-icon">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -347,7 +364,7 @@ function App() {
                     </div>
                     <div className="process-step-label">Background</div>
                 </div>
-                <div className={`process-step ${croppedImage && backgroundColor !== '#ffffff' ? 'completed' : ''}`}>
+                 <div className={`process-step ${croppedImage && backgroundColor !== '#ffffff' ? 'completed' : ''}`}>
                     <div className="process-step-icon">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -358,7 +375,6 @@ function App() {
                     <div className="process-step-label">Download</div>
                 </div>
             </div>
-
 
             <div className="upload-section">
                 <div className="file-input-wrapper">
@@ -387,15 +403,15 @@ function App() {
                         {isProcessing ? 'Processing' : 'Upload photo'}
                     </button>
                 </div>
-                
-                {showSuccessMessage && (
+
+                 {showSuccessMessage && (
                     <div className="success-message">
                         Image uploaded successfully!
                     </div>
                 )}
             </div>
 
-             {image && (
+            {image && (
                 <div className="editor-container">
                     <div className={`processing-overlay ${isProcessing ? 'visible' : ''}`}>
                         <div className="loading-spinner">
@@ -403,7 +419,6 @@ function App() {
                             <div className="spinner-text">{processingMessage}</div>
                         </div>
                     </div>
-                    
                      <div className="cropper-section">
                         <Cropper
                             src={image}
@@ -416,28 +431,27 @@ function App() {
                             crop={handleCropChange}
                             minCropBoxWidth={100}
                             minCropBoxHeight={100}
-                           autoCropArea={1}  // 使用完整图像区域
-                           viewMode={1}
+                            autoCropArea={1}
+                            viewMode={1}
                         />
                     </div>
-
-                       <div className="correction-section">
-                         {correctionImage && (
-                            <div className="image-container"> 
+                    <div className="correction-section">
+                        {correctionImage && (
+                            <div className="image-container">
                                 <img
                                     src={correctionImage}
                                     alt="Correction image"
                                     className="image-base"
                                     style={{ display: isProcessing && !correctionImage ? 'none' : 'block' }}
                                 />
-                                 <div className="image-overlay"> 
-                                     <img src={outline} alt="Outline" style={{ opacity: 0.5 }} />
+                                  <div className="image-overlay">
+                                      <img src={outline} alt="Outline" style={{ opacity: 0.5 }} />
                                 </div>
                             </div>
                         )}
                     </div>
-                     
-                    { (croppedImage || processedImage || image) && (
+                    
+                     { (croppedImage || processedImage || image) && (
                         <div className="preview-section">
                             <div className="image-container"> 
                                 <img 
@@ -455,7 +469,7 @@ function App() {
                     )}
                 </div>
             )}
-           
+
             {croppedImage && (
                 <div className="background-selector">
                     <h3>Select background color</h3>
@@ -479,8 +493,7 @@ function App() {
                 </div>
             )}
 
-
-             {croppedImage && (
+           {croppedImage && (
                 <div style={{ textAlign: 'center', marginTop: '2rem' }}>
                     <button 
                         onClick={handleDownload} 
