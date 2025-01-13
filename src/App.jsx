@@ -38,81 +38,85 @@ function App() {
 
     const handleImageUpload = async (e) => {
         const file = e.target.files[0];
-        if (file) {
-            try {
-                setImage(null);
-                setProcessedImage(null);
-                setCroppedImage(null);
-                setIsProcessing(true);
-                setProcessingMessage('Processing image');
-                setShowSuccessMessage(false);
-                setImageKey((prevKey) => prevKey + 1);
-                setCorrectionImage(null);
+        if (!file) return;
 
-                const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
-                if (!validTypes.includes(file.type)) {
-                    throw new Error('Unsupported file type');
-                }
+        try {
+            setImage(null);
+            setProcessedImage(null);
+            setCroppedImage(null);
+            setIsProcessing(true);
+            setProcessingMessage('Processing image');
+            setShowSuccessMessage(false);
+            setImageKey((prevKey) => prevKey + 1);
+            setCorrectionImage(null);
 
-                const blob = await removeBackground(file);
-                const reader = new FileReader();
-
-                return new Promise((resolve, reject) => {
-                    reader.onloadend = () => {
-                        const safeDataURL = reader.result.startsWith('data:image')
-                            ? reader.result
-                            : `data:image/png;base64,${reader.result}`;
-
-                        const img = new Image();
-                        img.onload = () => {
-                            const canvas = document.createElement('canvas');
-                            canvas.width = img.width;
-                            canvas.height = img.height;
-                            const ctx = canvas.getContext('2d');
-                            ctx.drawImage(img, 0, 0);
-
-                            const finalDataURL = canvas.toDataURL('image/png');
-                            setProcessedImage(finalDataURL);
-                            setImage(finalDataURL);
-                            setCroppedImage(finalDataURL);
-                            setProcessingMessage('Processing complete');
-                            setShowSuccessMessage(true);
-
-                            setTimeout(() => {
-                                setShowSuccessMessage(false);
-                            }, 3000);
-
-                            resolve();
-                        };
-
-                        img.onerror = () => {
-                            setIsProcessing(false);
-                            reject(new Error('Image loading failed'));
-                        };
-
-                        img.src = safeDataURL;
-                    };
-
-                    reader.onerror = () => {
-                        setIsProcessing(false);
-                        reject(new Error('File reading failed'));
-                    };
-
-                    reader.readAsDataURL(blob);
-                });
-
-            } catch (error) {
-                console.error('Image processing error:', error);
-                setProcessingMessage(error.message || 'Processing failed');
-                setImage(null);
-                setProcessedImage(null);
-                setCroppedImage(null);
-                setCorrectionImage(null);
-            } finally {
-                setIsProcessing(false);
+            const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
+            if (!validTypes.includes(file.type)) {
+                throw new Error('Unsupported file type');
             }
+
+            const blob = await removeBackground(file);
+             if (!blob) {
+                  throw new Error('Background removal failed.');
+             }
+            const reader = new FileReader();
+
+            return new Promise((resolve, reject) => {
+                reader.onloadend = () => {
+                    const safeDataURL = reader.result.startsWith('data:image')
+                        ? reader.result
+                        : `data:image/png;base64,${reader.result}`;
+
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+
+                        const finalDataURL = canvas.toDataURL('image/png');
+                        setProcessedImage(finalDataURL);
+                        setImage(finalDataURL);
+                         setCroppedImage(finalDataURL);
+                        setProcessingMessage('Processing complete');
+                        setShowSuccessMessage(true);
+
+                        setTimeout(() => {
+                            setShowSuccessMessage(false);
+                        }, 3000);
+
+                        resolve();
+                    };
+
+                    img.onerror = () => {
+                        setIsProcessing(false);
+                        reject(new Error('Image loading failed'));
+                    };
+
+                    img.src = safeDataURL;
+                };
+
+                reader.onerror = () => {
+                    setIsProcessing(false);
+                    reject(new Error('File reading failed'));
+                };
+
+                reader.readAsDataURL(blob);
+            });
+
+        } catch (error) {
+            console.error('Image processing error:', error);
+            setProcessingMessage(error.message || 'Processing failed');
+            setImage(null);
+            setProcessedImage(null);
+            setCroppedImage(null);
+            setCorrectionImage(null);
+        } finally {
+            setIsProcessing(false);
         }
     };
+
 
     const handleCropChange = () => {
         if (!cropperRef.current?.cropper || !processedImage) return;
@@ -121,7 +125,7 @@ function App() {
             const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas();
             const croppedImageDataURL = croppedCanvas.toDataURL('image/png');
             setCroppedImage(croppedImageDataURL);
-            setCorrectionImage(croppedImageDataURL);
+             setCorrectionImage(croppedImageDataURL);
         } catch (error) {
             console.error('Error updating preview:', error);
         }
@@ -150,31 +154,31 @@ function App() {
         }
     };
 
-    const handleBackgroundChange = async (color) => {
-        if (!processedImage || !croppedImage) return;
-
+   const handleBackgroundChange = async (color) => {
+        if (!croppedImage || !cropperRef.current?.cropper) return;
+    
         try {
             setIsProcessing(true);
             setProcessingMessage('Changing background color');
             setBackgroundColor(color);
-
+    
             const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas({
                 width: cropperRef.current.cropper.getCroppedCanvas().width,
                 height: cropperRef.current.cropper.getCroppedCanvas().height
             });
-
+            
             const canvas = document.createElement('canvas');
             canvas.width = croppedCanvas.width;
             canvas.height = croppedCanvas.height;
             const ctx = canvas.getContext('2d');
-
+    
             ctx.fillStyle = color;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(croppedCanvas, 0, 0);
-
+    
             const newImageWithBackground = canvas.toDataURL('image/png');
             setCroppedImage(newImageWithBackground);
-
+    
         } catch (error) {
             console.error('Error changing background:', error);
             setProcessingMessage('Failed to change background, please try again');
@@ -186,6 +190,7 @@ function App() {
         }
     };
 
+
     return (
         <div className="app">
             <header className="header">
@@ -193,9 +198,48 @@ function App() {
                 <p>Create professional ID photos with automatic background removal</p>
             </header>
            
-             <div className="process-steps">
-                <p><strong>Process Steps:</strong> Upload Photo - Crop Photo - Select Background - Download Photo</p>
+
+            <div className="process-steps">
+                <div className={`process-step ${image ? 'completed' : 'active'}`}>
+                    <div className="process-step-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                    </div>
+                    <div className="process-step-label">Upload</div>
+                </div>
+                <div className={`process-step ${croppedImage ? 'completed' : (image ? 'active' : '')}`}>
+                    <div className="process-step-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="9" y1="9" x2="15" y2="15"/>
+                            <line x1="15" y1="9" x2="9" y2="15"/>
+                        </svg>
+                    </div>
+                    <div className="process-step-label">Crop</div>
+                </div>
+                <div className={`process-step ${backgroundColor !== '#ffffff' ? 'completed' : (croppedImage ? 'active' : '')}`}>
+                    <div className="process-step-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                        </svg>
+                    </div>
+                    <div className="process-step-label">Background</div>
+                </div>
+                 <div className={`process-step ${croppedImage && backgroundColor !== '#ffffff' ? 'completed' : ''}`}>
+                    <div className="process-step-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                    </div>
+                    <div className="process-step-label">Download</div>
+                </div>
             </div>
+            
 
             <div className="upload-section">
                 <div className="file-input-wrapper">
@@ -318,7 +362,7 @@ function App() {
                 <div style={{ textAlign: 'center', marginTop: '2rem' }}>
                     <button 
                         onClick={handleDownload} 
-                        className={`button button-primary ${isProcessing ? 'loading-button' : ''}`}
+                         className={`button button-primary ${isProcessing ? 'loading-button' : ''}`}
                         disabled={isProcessing}
                     >
                         <svg

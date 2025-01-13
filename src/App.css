@@ -21,6 +21,71 @@
   padding: 20px;
 }
 
+/* Enhanced Process Steps */
+.process-steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 2rem auto;
+  padding: 1rem;
+  max-width: 800px;
+  position: relative;
+}
+
+.process-steps::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--gray-300);
+  z-index: 1;
+}
+
+.process-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+  position: relative;
+}
+
+.process-step-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--gray-200);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.process-step.active .process-step-icon {
+  background: var(--primary);
+  color: white;
+  transform: scale(1.1);
+}
+
+.process-step.completed .process-step-icon {
+  background: var(--primary-dark);
+  color: white;
+}
+
+.process-step-label {
+  font-size: 0.9rem;
+  color: var(--gray-700);
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+.process-step.active .process-step-label {
+  color: var(--gray-900);
+  font-weight: 500;
+}
+
 .header {
   text-align: center;
   margin-bottom: 1rem;
@@ -166,7 +231,7 @@
     
     .cropper-section,
     .preview-section,
-    .correction-section {
+     .correction-section {
         width: 50%;
     }
 }
@@ -189,7 +254,6 @@
     justify-content: center;
     align-items: center;
 }
-
 
 /* 新增样式，统一图片容器 */
 .image-container {
@@ -421,3 +485,4 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
