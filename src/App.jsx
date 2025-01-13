@@ -257,31 +257,32 @@ function App() {
                     </div>
 
                        <div className="correction-section">
-                        {correctionImage && (
-                            <div className="correction-image-container">
+                         {correctionImage && (
+                            <div className="image-container"> 
                                 <img
                                     src={correctionImage}
                                     alt="Correction image"
-                                    className="correction-base-image"
+                                    className="image-base"
                                     style={{ display: isProcessing && !correctionImage ? 'none' : 'block' }}
                                 />
-                                  <div className="correction-overlay">
-                                        <img src={outline} alt="Outline" style={{ opacity: 0.5 }} />
-                                  </div>
+                                 <div className="image-overlay"> 
+                                     <img src={outline} alt="Outline" style={{ opacity: 0.5 }} />
+                                </div>
                             </div>
                         )}
                     </div>
 
                     { (croppedImage || processedImage || image) && (
                         <div className="preview-section">
-                            <div className="preview-image">
+                            <div className="image-container"> 
                                 <img 
                                     key={imageKey} 
                                     src={croppedImage || processedImage || image}
-                                    alt="Processed image"
+                                     alt="Processed image"
                                     onError={(e) => {
                                         e.target.src = '';
                                     }}
+                                    className="image-base"
                                     style={{ display: isProcessing && !(croppedImage || processedImage || image) ? 'none' : 'block' }}
                                 />
                             </div>
@@ -344,4 +345,3 @@ function App() {
 }
 
 export default App;
-
