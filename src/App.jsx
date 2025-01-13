@@ -137,9 +137,9 @@ function App() {
             setImageKey((prevKey) => prevKey + 1);
             setCorrectionImage(null);
 
-            const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
+            const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/tiff', 'image/svg+xml'];
             if (!validTypes.includes(file.type)) {
-                throw new Error('Unsupported file type');
+                throw new Error(`Unsupported file type. Supported formats: ${validTypes.join(', ')}`);
             }
 
             const blob = await removeBackground(file);
