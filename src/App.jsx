@@ -33,75 +33,77 @@ function App() {
 
     // 智能裁剪函数
     const intelligentCrop = (img) => {
-        // 日志组
         console.group('Intelligent Crop Detailed Analysis');
-        
-        // 基础图像信息日志
+    
+    
+        // 图像基本信息
         console.log('Image Original Details:', {
             naturalWidth: img.naturalWidth,
             naturalHeight: img.naturalHeight,
             aspectRatio: img.naturalWidth / img.naturalHeight
         });
-
-
-        // 人体区域分析
+    
+    
+        // 人体区域信息（假设已知）
         const personArea = {
-            top: 114,    // 从之前日志获取
+            top: 114,    
             bottom: 1571,
             left: 99,
             right: 1215,
             width: 1116,
-            height: 1457  // bottom - top
+            height: 1457
         };
-
-
-        // 计算人体区域比例
+    
+    
+        // 人体区域比例分析
         const personAreaRatio = {
             verticalPosition: personArea.top / img.naturalHeight,
             horizontalPosition: personArea.left / img.naturalWidth,
             personHeightRatio: (personArea.bottom - personArea.top) / img.naturalHeight
         };
         console.log('Person Area Ratio:', personAreaRatio);
-
-
-        // 证件照标准比例配置
+    
+    
+        // 证件照比例配置
         const PHOTO_RATIOS = {
-            '1inch': { width: 3, height: 4 },   // 1英寸
-            '2inch': { width: 4, height: 6 },   // 2英寸
-            'passport': { width: 3, height: 4 } // 护照
+            '3:4': { width: 3, height: 4 },
+            '2:3': { width: 2, height: 3 },
+            '4:5': { width: 4, height: 5 }
         };
-
-
-        // 选择默认比例
-        const selectedRatio = PHOTO_RATIOS['passport'];
+    
+    
+        // 选择比例策略
+        const selectedRatio = PHOTO_RATIOS['3:4'];
         const targetRatio = selectedRatio.width / selectedRatio.height;
-
-
-        // 动态计算裁剪尺寸
+    
+    
+        // 动态计算裁剪尺寸策略
         const recommendedWidth = img.naturalWidth * 0.6; // 原图60%宽度
         const recommendedHeight = recommendedWidth / targetRatio;
-
-
+    
+    
         // 垂直位置优化
-        const verticalOffset = personArea.top + (personArea.height * 0.3);
-        
+        // 调整人体垂直位置，避免上下留白过多
+        const verticalOffset = personArea.top + (personArea.height * 0.25); // 调整为25%
+    
+    
         // 水平居中计算
         const horizontalOffset = (img.naturalWidth - recommendedWidth) / 2;
-
-
+    
+    
         const cropData = {
             left: horizontalOffset,
             top: verticalOffset,
             width: recommendedWidth,
             height: recommendedHeight
         };
-
-
+    
+    
         // 安全边界检查
         cropData.left = Math.max(0, Math.min(cropData.left, img.naturalWidth - cropData.width));
         cropData.top = Math.max(0, Math.min(cropData.top, img.naturalHeight - cropData.height));
-
-
+    
+    
         // 详细日志输出
         console.log('Recommended Crop Configuration:', {
             ratioUsed: `${selectedRatio.width}:${selectedRatio.height}`,
@@ -111,11 +113,11 @@ function App() {
                 withinImageHeight: cropData.top + cropData.height <= img.naturalHeight
             }
         });
-
-
+    
+    
         console.groupEnd();
-
-
+    
+    
         return cropData;
     };
 
@@ -191,22 +193,39 @@ function App() {
                         setTimeout(() => {
                             if (cropperRef.current?.cropper) {
                                 const cropper = cropperRef.current.cropper;
-                                
-                                // 智能裁剪
                                 const autoCropData = intelligentCrop(img);
-                                console.log('Auto Crop Recommendation:', autoCropData);
-    
-    
-                                // 获取图像和画布数据
+                                console.log('Auto crop data:', autoCropData);
+                        
+                        
                                 const imageData = cropper.getImageData();
                                 const canvasData = cropper.getCanvasData();
-    
-    
-                                // 计算缩放比例
-                                const scaleX = canvasData.naturalWidth / imageData.naturalWidth;
-                                const scaleY = canvasData.naturalHeight / imageData.naturalHeight;
-    
-    
+                        
+                        
+                                // 调试日志：输出关键缩放信息
+                                console.log('Image Data:', {
+                                    naturalWidth: imageData.naturalWidth,
+                                    naturalHeight: imageData.naturalHeight,
+                                    width: imageData.width,
+                                    height: imageData.height
+                                });
+                        
+                        
+                                console.log('Canvas Data:', {
+                                    naturalWidth: canvasData.naturalWidth,
+                                    naturalHeight: canvasData.naturalHeight,
+                                    width: canvasData.width,
+                                    height: canvasData.height
+                                });
+                        
+                        
+                                // 计算精确的缩放比例
+                                const scaleX = canvasData.width / imageData.naturalWidth;
+                                const scaleY = canvasData.height / imageData.naturalHeight;
+                        
+                        
+                                console.log('Scale Factors:', { scaleX, scaleY });
+                        
+                        
                                 // 转换裁剪坐标
                                 const scaledCropData = {
                                     left: autoCropData.left * scaleX,
@@ -214,16 +233,23 @@ function App() {
                                     width: autoCropData.width * scaleX,
                                     height: autoCropData.height * scaleY
                                 };
-    
-    
-                                // 设置裁剪框
-                                cropper.setCropBoxData(scaledCropData);
-    
-    
+                        
+                        
+                                console.log('Scaled Crop Data:', scaledCropData);
+                        
+                        
+                                // 设置裁剪框，增加安全检查
+                                cropper.setCropBoxData({
+                                    left: scaledCropData.left,
+                                    top: scaledCropData.top,
+                                    width: scaledCropData.width,
+                                    height: scaledCropData.height
+                                });
+                        
+                        
                                 console.log('Final Cropper Box Configuration:', cropper.getCropBoxData());
                             }
                         }, 100);
-    
     
                         // 处理完成提示
                         setProcessingMessage('Processing complete');
