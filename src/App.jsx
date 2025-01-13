@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Cropper from 'react-cropper';
 import 'cropperjs/dist/cropper.css';
 import './App.css';
@@ -16,9 +16,10 @@ function App() {
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const [imageKey, setImageKey] = useState(0);
     const cropperRef = useRef(null);
+     const imageRef = useRef(new Image()); // 缓存 Image 对象
+     const lastProcessedImageData = useRef(null);
 
-
-    const presetColors = [
+    const presetColors = useMemo(() => [
         { name: 'White', value: '#ffffff' },
         { name: 'Red', value: '#ff0000' },
         { name: 'Blue', value: '#0000ff' },
@@ -28,10 +29,9 @@ function App() {
         { name: 'Navy Blue', value: '#000080' },
         { name: 'Gray', value: '#808080' },
         { name: 'Light Gray', value: '#d3d3d3' },
-    ];
-
-
-    // 智能裁剪函数
+    ], []);
+    
+    // 智能裁剪函数 - 优化版
     const intelligentCrop = (img) => {
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
@@ -129,24 +129,29 @@ function App() {
     
         // 裁剪框计算
         const personWidth = rightX - leftX;
-        const recommendedWidth = personWidth * 0.7;  // 取70%宽度
-        const recommendedHeight = recommendedWidth * (4/3);  // 3:4比例
+        const personHeight = bottomY - topY;
     
     
-        // 关键优化：动态计算头顶空白
-        const headTopBuffer = Math.max(
-            recommendedHeight * 0.1,  // 最小保留10%高度作为头顶空白
-            Math.min(
-                recommendedHeight * 0.2,  // 最大不超过20%
-                (headEndY - topY) * 0.3   // 考虑实际头部区域
-            )
-        );
+        // 针对非常窄的图片，调整裁剪策略
+        const aspectRatio = img.width / img.height;
+        let recommendedWidth, recommendedHeight;
     
     
+        if (aspectRatio < 0.5) {  // 非常窄的图片
+            recommendedWidth = personWidth * 0.5;  // 取50%宽度
+            recommendedHeight = recommendedWidth * (4/3);  // 3:4比例
+        } else {
+            recommendedWidth = personWidth * 0.7;  // 取70%宽度
+            recommendedHeight = recommendedWidth * (4/3);  // 3:4比例
+        }
+    
+    
+        // 垂直位置优化
+        const verticalOffset = topY + (personHeight * 0.25);  // 从顶部往下25%
+        
         const cropData = {
-            // 使用人体中心线进行水平居中
             left: personCenterX - (recommendedWidth / 2),
-            top: Math.max(topY, headEndY - headTopBuffer),  // 向上调整
+            top: verticalOffset,
             width: recommendedWidth,
             height: recommendedHeight
         };
@@ -159,26 +164,23 @@ function App() {
     
         console.log('Intelligent Crop Precise Details:', {
             imageSize: `${img.width}x${img.height}`,
+            aspectRatio: aspectRatio,
             personArea: {
                 top: topY,
                 bottom: bottomY,
                 left: leftX,
                 right: rightX,
                 width: personWidth,
-                height: bottomY - topY,
+                height: personHeight,
                 centerX: personCenterX
             },
             cropDetails: {
-                headTopBuffer,
+                verticalOffset,
                 recommendedHeadHeight: recommendedHeight,
                 cropHeight: cropData.height,
                 cropWidth: cropData.width,
                 cropTop: cropData.top,
                 cropLeft: cropData.left
-            },
-            widthChanges: {
-                maxChange: maxWidthChange,
-                maxChangeIndex: maxWidthChangeIndex
             }
         });
     
@@ -186,10 +188,9 @@ function App() {
         return cropData;
     };
 
-    const handleImageUpload = async (e) => {
+   const handleImageUpload = useCallback(async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-    
     
         try {
             // 重置状态
@@ -197,11 +198,10 @@ function App() {
             setProcessedImage(null);
             setCroppedImage(null);
             setIsProcessing(true);
-            setProcessingMessage('Processing image');
+             setProcessingMessage('Processing image');
             setShowSuccessMessage(false);
-            setImageKey((prevKey) => prevKey + 1);
-            setCorrectionImage(null);
-    
+           setImageKey((prevKey) => prevKey + 1);
+           setCorrectionImage(null);
     
             // 详细日志组
             console.group('Image Upload and Processing');
@@ -210,8 +210,8 @@ function App() {
     
             // 文件类型验证
             const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/tiff', 'image/svg+xml'];
-            if (!validTypes.includes(file.type)) {
-                throw new Error(`Unsupported file type. Supported formats: ${validTypes.join(', ')}`);
+           if (!validTypes.includes(file.type)) {
+              throw new Error(`Unsupported file type. Supported formats: ${validTypes.join(', ')}`);
             }
     
     
@@ -221,261 +221,220 @@ function App() {
                 throw new Error('Background removal failed.');
             }
     
-    
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
-                
                 reader.onloadend = () => {
-                    const safeDataURL = reader.result.startsWith('data:image')
+                     const safeDataURL = reader.result.startsWith('data:image')
                         ? reader.result
                         : `data:image/png;base64,${reader.result}`;
-    
-    
-                    const img = new Image();
-                    img.onload = () => {
-                        console.log('Image Loaded Details:', {
-                            width: img.width,
-                            height: img.height,
-                            aspectRatio: img.width / img.height
-                        });
-    
-    
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0);
-    
-    
-                        const finalDataURL = canvas.toDataURL('image/png');
-                        setProcessedImage(finalDataURL);
-                        setImage(finalDataURL);
-                        setCroppedImage(finalDataURL);
-    
-    
-                        // 智能裁剪延迟处理
-                        setTimeout(() => {
-                            if (cropperRef.current?.cropper) {
-                                const cropper = cropperRef.current.cropper;
-                                const autoCropData = intelligentCrop(img);
-                                console.log('Auto crop data:', autoCropData);
                         
-                        
-                                const imageData = cropper.getImageData();
-                                const canvasData = cropper.getCanvasData();
-                        
-                        
-                                // 调试日志：输出关键缩放信息
-                                console.log('Image Data:', {
-                                    naturalWidth: imageData.naturalWidth,
-                                    naturalHeight: imageData.naturalHeight,
-                                    width: imageData.width,
-                                    height: imageData.height
-                                });
-                        
-                        
-                                console.log('Canvas Data:', {
-                                    naturalWidth: canvasData.naturalWidth,
-                                    naturalHeight: canvasData.naturalHeight,
-                                    width: canvasData.width,
-                                    height: canvasData.height
-                                });
-                        
-                        
-                                // 计算精确的缩放比例
-                                const scaleX = canvasData.width / imageData.naturalWidth;
-                                const scaleY = canvasData.height / imageData.naturalHeight;
-                        
-                        
-                                console.log('Scale Factors:', { scaleX, scaleY });
-                        
-                        
-                                // 转换裁剪坐标
-                                const scaledCropData = {
-                                    left: autoCropData.left * scaleX,
-                                    top: autoCropData.top * scaleY,
-                                    width: autoCropData.width * scaleX,
-                                    height: autoCropData.height * scaleY
-                                };
-                        
-                        
-                                console.log('Scaled Crop Data:', scaledCropData);
-                        
-                        
-                                // 设置裁剪框，增加安全检查
-                                cropper.setCropBoxData({
-                                    left: scaledCropData.left,
-                                    top: scaledCropData.top,
-                                    width: scaledCropData.width,
-                                    height: scaledCropData.height
-                                });
-                        
-                        
-                                console.log('Final Cropper Box Configuration:', cropper.getCropBoxData());
-                            }
-                        }, 100);
-    
-                        // 处理完成提示
-                        setProcessingMessage('Processing complete');
-                        setShowSuccessMessage(true);
+                      imageRef.current.onload = () => {
+                          const img = imageRef.current
+                           console.log('Image Loaded Details:', {
+                                width: img.width,
+                                height: img.height,
+                                aspectRatio: img.width / img.height
+                            });
     
     
-                        setTimeout(() => {
-                            setShowSuccessMessage(false);
-                        }, 3000);
+                           const canvas = document.createElement('canvas');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                             const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0);
+    
+                            const finalDataURL = canvas.toDataURL('image/png');
+                            
+                            // 设置初始图片
+                           setImage(finalDataURL);
+                          setProcessedImage(finalDataURL);
+                           setCroppedImage(finalDataURL);
+                           lastProcessedImageData.current = {
+                                dataURL: finalDataURL,
+                                width: img.width,
+                                height: img.height,
+                                aspectRatio: img.width / img.height
+                            };
+    
+                         // 智能裁剪延迟处理
+                            setTimeout(() => {
+                                if (cropperRef.current?.cropper) {
+                                    const cropper = cropperRef.current.cropper;
+                                    const autoCropData = intelligentCrop(img);
+                                    console.log('Auto crop data:', autoCropData);
     
     
-                        console.timeEnd('TotalProcessingTime');
-                        console.groupEnd();
+                                   const imageData = cropper.getImageData();
+                                    const canvasData = cropper.getCanvasData();
+                        
+                                     // 调试日志：输出关键缩放信息
+                                    console.log('Image Data:', {
+                                       naturalWidth: imageData.naturalWidth,
+                                        naturalHeight: imageData.naturalHeight,
+                                        width: imageData.width,
+                                        height: imageData.height
+                                    });
     
+                                    console.log('Canvas Data:', {
+                                        naturalWidth: canvasData.naturalWidth,
+                                       naturalHeight: canvasData.naturalHeight,
+                                        width: canvasData.width,
+                                        height: canvasData.height
+                                   });
     
-                        resolve();
-                    };
+                                    const scaleX = canvasData.width / imageData.naturalWidth;
+                                    const scaleY = canvasData.height / imageData.naturalHeight;
+                                    console.log('Scale Factors:', { scaleX, scaleY });
+                        
+                                    const scaledCropData = {
+                                        left: autoCropData.left * scaleX,
+                                        top: autoCropData.top * scaleY,
+                                         width: autoCropData.width * scaleX,
+                                        height: autoCropData.height * scaleY
+                                   };
     
+                                   console.log('Scaled Crop Data:', scaledCropData);
     
-                    img.onerror = () => {
-                        console.error('Image Loading Failed');
-                        setIsProcessing(false);
-                        reject(new Error('Image loading failed'));
-                    };
+                                    cropper.setCropBoxData({
+                                       left: scaledCropData.left,
+                                        top: scaledCropData.top,
+                                        width: scaledCropData.width,
+                                         height: scaledCropData.height
+                                   });
     
-    
-                    img.src = safeDataURL;
-                };
-    
-    
-                reader.onerror = () => {
-                    console.error('File Reading Failed');
-                    setIsProcessing(false);
-                    reject(new Error('File reading failed'));
-                };
-    
-    
-                reader.readAsDataURL(blob);
-            });
-    
-    
+                                    console.log('Final Cropper Box Configuration:', cropper.getCropBoxData());
+                                }
+                            }, 100);
+                         
+                             // 处理完成提示
+                            setProcessingMessage('Processing complete');
+                            setShowSuccessMessage(true);
+                            setTimeout(() => {
+                                setShowSuccessMessage(false);
+                             }, 3000);
+                                
+                                
+                           console.timeEnd('TotalProcessingTime');
+                           console.groupEnd();
+                           resolve();
+                      };
+                           
+                    imageRef.current.onerror = () => {
+                         console.error('Image Loading Failed');
+                          setIsProcessing(false);
+                           reject(new Error('Image loading failed'));
+                        };
+                     imageRef.current.src = safeDataURL;
+                   };
+                    
+                     reader.onerror = () => {
+                       console.error('File Reading Failed');
+                       setIsProcessing(false);
+                       reject(new Error('File reading failed'));
+                     };
+                     reader.readAsDataURL(blob);
+                });
         } catch (error) {
-            console.error('Image Processing Error:', error);
+           console.error('Image Processing Error:', error);
             setProcessingMessage(error.message || 'Processing failed');
             
-            // 重置所有状态
             setImage(null);
             setProcessedImage(null);
-            setCroppedImage(null);
-            setCorrectionImage(null);
-    
-    
+           setCroppedImage(null);
+           setCorrectionImage(null);
         } finally {
-            setIsProcessing(false);
-        }
-    };
+           setIsProcessing(false);
+       }
+    }, [intelligentCrop]);
 
 
-    const handleCropChange = () => {
-        if (!cropperRef.current?.cropper || !image) return;
-
-        try {
+    const handleCropChange = useCallback(() => {
+       if (!cropperRef.current?.cropper || !image) return;
+        
+       try {
              const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas();
             const croppedImageDataURL = croppedCanvas.toDataURL('image/png');
-            setCroppedImage(croppedImageDataURL);
+           setCroppedImage(croppedImageDataURL);
            
-            // 生成无背景图，用于outline
-            const img = new Image();
-            img.onload = () => {
-               const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                setCorrectionImage(canvas.toDataURL('image/png'));
+           const img = new Image();
+           img.onload = () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.width;
+              canvas.height = img.height;
+             const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0);
+              setCorrectionImage(canvas.toDataURL('image/png'));
             };
            img.src=croppedImageDataURL;
         } catch (error) {
             console.error('Error updating preview:', error);
         }
-    };
+    }, [image]);
 
-    const handleDownload = async () => {
-        if (!croppedImage) return;
-
+    const handleDownload = useCallback(async () => {
+      if (!croppedImage) return;
+        
         try {
             const response = await fetch(croppedImage);
             const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
+             const url = URL.createObjectURL(blob);
+             const link = document.createElement('a');
             link.href = url;
-            link.download = 'id-photo.png';
-            document.body.appendChild(link);
+             link.download = 'id-photo.png';
+             document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
+             document.body.removeChild(link);
             URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error('Error downloading image:', error);
-            setProcessingMessage('Download failed, please try again');
-            setTimeout(() => {
-                setProcessingMessage('');
+       } catch (error) {
+           console.error('Error downloading image:', error);
+           setProcessingMessage('Download failed, please try again');
+           setTimeout(() => {
+               setProcessingMessage('');
             }, 3000);
         }
-    };
+    }, [croppedImage]);
 
 
-    const handleBackgroundChange = async (color) => {
-        if (!image || !cropperRef.current?.cropper) return;
-    
+   const handleBackgroundChange = useCallback(async (color) => {
+       if (!image || !cropperRef.current?.cropper) return;
     
         try {
-            setIsProcessing(true);
+           setIsProcessing(true);
             setProcessingMessage('Changing background color');
-            setBackgroundColor(color);
+             setBackgroundColor(color);
             
-            const cropper = cropperRef.current.cropper;
-            // 获取当前完整的裁剪画布
-            const croppedCanvas = cropper.getCroppedCanvas({
-                // 明确指定与原始图像相同的宽高
+           const cropper = cropperRef.current.cropper;
+           const croppedCanvas = cropper.getCroppedCanvas({
                 width: cropper.getImageData().naturalWidth,
                 height: cropper.getImageData().naturalHeight
             });
     
     
             const canvas = document.createElement('canvas');
-            canvas.width = croppedCanvas.width;  // 保持原始宽度
+             canvas.width = croppedCanvas.width;  // 保持原始宽度
             canvas.height = croppedCanvas.height;  // 保持原始高度
-            const ctx = canvas.getContext('2d');
+             const ctx = canvas.getContext('2d');
     
-    
-            // 用指定颜色填充完整背景
-            ctx.fillStyle = color;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+             ctx.fillStyle = color;
+             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // 绘制完整的裁剪图像
-            ctx.drawImage(croppedCanvas, 0, 0);
+             ctx.drawImage(croppedCanvas, 0, 0);
     
-    
-            // 将新画布转换为数据URL
             const newImageDataURL = canvas.toDataURL('image/png');
-            
-            // 更新图像，保持原始大小
             setProcessedImage(newImageDataURL);
-             // 更新 croppedImage 以便预览
             setCroppedImage(newImageDataURL);
     
-    
             setProcessingMessage('Processing complete');
-            setShowSuccessMessage(true);
-    
-    
-            setTimeout(() => {
-                setShowSuccessMessage(false);
+             setShowSuccessMessage(true);
+           setTimeout(() => {
+               setShowSuccessMessage(false);
             }, 3000);
-    
-    
         } catch (error) {
-            console.error('Background change error:', error);
-        } finally {
-            setIsProcessing(false);
-        }
-    };
+           console.error('Background change error:', error);
+       } finally {
+           setIsProcessing(false);
+       }
+    }, [image]);
 
     return (
         <div className="app">
