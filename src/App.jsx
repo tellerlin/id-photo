@@ -245,12 +245,14 @@ function App() {
                         <Cropper
                             src={image}
                             style={{ height: 400, width: '100%' }}
-                            aspectRatio={3 / 4} // 设置 3:4 的比例
+                            aspectRatio={3 / 4}
                             guides={true}
                             ref={cropperRef}
                             zoomable={false}
                             zoomOnWheel={false}
                             crop={handleCropChange}
+                            minCropBoxWidth={100}  // 设置最小宽度
+                            minCropBoxHeight={100} // 设置最小高度
                         />
                     </div>
 
@@ -342,3 +344,4 @@ function App() {
 }
 
 export default App;
+
