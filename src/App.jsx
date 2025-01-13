@@ -1,114 +1,98 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import Cropper from 'react-cropper';
-import { removeBackground } from '@imgly/background-removal';
 import 'cropperjs/dist/cropper.css';
 import './App.css';
 import outline from './assets/outline.png';
 
 function App() {
     const [image, setImage] = useState(null);
+    const [processedImage, setProcessedImage] = useState(null);
     const [croppedImage, setCroppedImage] = useState(null);
+    const [correctionImage, setCorrectionImage] = useState(null);
     const [backgroundColor, setBackgroundColor] = useState('#ffffff');
     const [isProcessing, setIsProcessing] = useState(false);
     const [processingMessage, setProcessingMessage] = useState('');
-    const cropperRef = useRef(null);
-    const [processedImage, setProcessedImage] = useState(null);
     const [showSuccessMessage, setShowSuccessMessage] = useState(false);
     const [imageKey, setImageKey] = useState(0);
-    const [correctionImage, setCorrectionImage] = useState(null);
-
-    const presetColors = [
-        { name: 'White', value: '#ffffff' },
-        { name: 'Red', value: '#ff0000' },
-        { name: 'Blue', value: '#0000ff' },
-        { name: 'Bright Blue', value: '#4285F4' },
-        { name: 'Light Blue', value: '#add8e6' },
-        { name: 'Sky Blue', value: '#87ceeb' },
-        { name: 'Navy Blue', value: '#000080' },
-        { name: 'Gray', value: '#808080' },
-        { name: 'Light Gray', value: '#d3d3d3' },
-    ];
-
-    useEffect(() => {
-        if (processedImage) {
-            setCroppedImage(processedImage);
-        }
-    }, [processedImage]);
 
 
-    const intelligentCrop = (image) => {
-        const aspectRatio = 3 / 4;
-        const width = image.naturalWidth;
-        const height = image.naturalHeight;
-        
-        console.log('Original image dimensions:', width, 'x', height);
-
-        // 创建canvas分析图像
+    const cropperRef = useRef(null);
+    const intelligentCrop = (img) => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        canvas.width = width;
-        canvas.height = height;
-        ctx.drawImage(image, 0, 0);
-        const imageData = ctx.getImageData(0, 0, width, height);
-        const data = imageData.data;
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
 
-        // 1. 检测头部顶部位置
-        let headTop = height;
+        const width = img.width;
+        const height = img.height;
+        const data = ctx.getImageData(0, 0, width, height).data;
+        const aspectRatio = 3 / 4; // 标准证件照比例
+
+        // 1. 精确检测有效区域
+        let topY = height, bottomY = 0, leftX = width, rightX = 0;
         for (let y = 0; y < height; y++) {
+            let rowHasContent = false;
             for (let x = 0; x < width; x++) {
                 const index = (y * width + x) * 4;
                 const alpha = data[index + 3];
                 if (alpha > 10) {
-                    headTop = y;
-                    break;
+                    rowHasContent = true;
+                    leftX = Math.min(leftX, x);
+                    rightX = Math.max(rightX, x);
                 }
             }
-            if (headTop !== height) break;
-        }
-        
-        console.log('Detected head top position:', headTop);
-
-        // 2. 检测肩部底部位置
-        let shoulderBottom = 0;
-        for (let y = height - 1; y >= 0; y--) {
-            for (let x = 0; x < width; x++) {
-                const index = (y * width + x) * 4;
-                const alpha = data[index + 3];
-                if (alpha > 10) {
-                    shoulderBottom = y;
-                    break;
-                }
+            if (rowHasContent) {
+                topY = Math.min(topY, y);
+                bottomY = Math.max(bottomY, y);
             }
-            if (shoulderBottom !== 0) break;
         }
-        
-        console.log('Detected shoulder bottom position:', shoulderBottom);
 
-        // 3. 计算头部高度
-        const headHeight = shoulderBottom - headTop;
-        
-        // 4. 计算裁剪框高度（不超过图像高度）
-        const cropHeight = Math.min(height, headHeight * 1.2);
-        
-        // 5. 根据宽高比计算裁剪框宽度（不超过图像宽度）
-        const cropWidth = Math.min(width, cropHeight * aspectRatio);
-        
-        // 6. 计算裁剪框位置（居中并考虑头部位置）
-        const cropTop = Math.max(0, headTop - (cropHeight - headHeight)/2);
-        const cropLeft = Math.max(0, (width - cropWidth) / 2);
-        
-        console.log('Calculated head height:', headHeight);
-        console.log('Final crop box dimensions:', cropWidth, 'x', cropHeight);
-        console.log('Final crop box position:', {left: cropLeft, top: cropTop});
+        // 2. 计算人像实际尺寸
+        const personWidth = rightX - leftX;
+        const personHeight = bottomY - topY;
+
+        // 3. 计算推荐裁剪高度 (更精确的头部区域)
+        const recommendedHeadHeight = Math.min(personHeight * 0.5, height * 0.6);
+        const cropHeight = recommendedHeadHeight * 1.5; // 留出更多空间
+
+        // 4. 计算裁剪宽度(严格保持3:4比例)
+        const cropWidth = cropHeight * aspectRatio;
+
+        // 5. 计算裁剪起始位置(居中)
+        const cropTop = Math.max(0, topY - (cropHeight - recommendedHeadHeight) / 2);
+        const cropLeft = Math.max(0, leftX + (personWidth - cropWidth) / 2);
+
+        // 6. 安全校验
+        const finalCropTop = Math.min(cropTop, height - cropHeight);
+        const finalCropLeft = Math.min(cropLeft, width - cropWidth);
+
+        console.log('Intelligent Crop Precise Details:', {
+            imageSize: `${width}x${height}`,
+            personArea: {
+                top: topY,
+                bottom: bottomY,
+                left: leftX,
+                right: rightX,
+                width: personWidth,
+                height: personHeight
+            },
+            cropDetails: {
+                recommendedHeadHeight,
+                cropHeight,
+                cropWidth,
+                cropTop: finalCropTop,
+                cropLeft: finalCropLeft
+            }
+        });
 
         return {
-            left: cropLeft,
-            top: cropTop,
+            left: finalCropLeft,
+            top: finalCropTop,
             width: cropWidth,
             height: cropHeight
         };
     };
-
 
     const handleImageUpload = async (e) => {
         const file = e.target.files[0];
@@ -124,15 +108,7 @@ function App() {
             setImageKey((prevKey) => prevKey + 1);
             setCorrectionImage(null);
 
-            const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/tiff', 'image/svg+xml'];
-            if (!validTypes.includes(file.type)) {
-                throw new Error(`Unsupported file type. Supported formats: ${validTypes.join(', ')}`);
-            }
 
-            const blob = await removeBackground(file);
-            if (!blob) {
-                  throw new Error('Background removal failed.');
-            }
             const reader = new FileReader();
 
             return new Promise((resolve, reject) => {
@@ -152,26 +128,37 @@ function App() {
                         const finalDataURL = canvas.toDataURL('image/png');
                         setProcessedImage(finalDataURL);
                         setImage(finalDataURL);
-                         setCroppedImage(finalDataURL);
+                        setCroppedImage(finalDataURL);
 
-                         setTimeout(() => {
+                        setTimeout(() => {
                             if (cropperRef.current?.cropper) {
+                                const cropper = cropperRef.current.cropper;
                                 const autoCropData = intelligentCrop(img);
                                 console.log('Auto crop data:', autoCropData);
-                                
-                                // 先设置crop box尺寸
-                                cropperRef.current.cropper.setCropBoxData({
-                                    width: autoCropData.width,
-                                    height: autoCropData.height
+
+                                const imageData = cropper.getImageData();
+                                const canvasData = cropper.getCanvasData();
+
+                                // 计算缩放比例
+                                const scaleX = canvasData.naturalWidth / imageData.naturalWidth;
+                                const scaleY = canvasData.naturalHeight / imageData.naturalHeight;
+
+                                // 将原始坐标转换为cropper组件内部的坐标
+                                const scaledCropLeft = autoCropData.left * scaleX;
+                                const scaledCropTop = autoCropData.top * scaleY;
+                                const scaledCropWidth = autoCropData.width * scaleX;
+                                const scaledCropHeight = autoCropData.height * scaleY;
+
+
+                                cropper.setCropBoxData({
+                                    left: scaledCropLeft,
+                                    top: scaledCropTop,
+                                    width: scaledCropWidth,
+                                    height: scaledCropHeight
                                 });
-                                
-                                // 再设置crop box位置
-                                cropperRef.current.cropper.setCropBoxData({
-                                    left: autoCropData.left,
-                                    top: autoCropData.top
-                                });
-                                
-                                console.log('Cropper crop box data after set:', cropperRef.current.cropper.getCropBoxData());
+
+
+                                console.log('Cropper crop box data after set:', cropper.getCropBoxData());
                             }
                         }, 100);
 
@@ -198,7 +185,7 @@ function App() {
                     reject(new Error('File reading failed'));
                 };
 
-                reader.readAsDataURL(blob);
+                reader.readAsDataURL(file);
             });
 
         } catch (error) {
@@ -208,23 +195,27 @@ function App() {
             setProcessedImage(null);
             setCroppedImage(null);
             setCorrectionImage(null);
+
         } finally {
             setIsProcessing(false);
         }
     };
 
+
     const handleCropChange = () => {
-        if (!cropperRef.current?.cropper || !processedImage) return;
+        if (!cropperRef.current?.cropper || !image) return;
 
         try {
             const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas();
             const croppedImageDataURL = croppedCanvas.toDataURL('image/png');
             setCroppedImage(croppedImageDataURL);
-             setCorrectionImage(croppedImageDataURL);
+            setCorrectionImage(croppedImageDataURL);
+
         } catch (error) {
             console.error('Error updating preview:', error);
         }
     };
+
 
     const handleDownload = async () => {
         if (!croppedImage) return;
@@ -249,31 +240,54 @@ function App() {
         }
     };
 
-   const handleBackgroundChange = async (color) => {
-        if (!croppedImage || !cropperRef.current?.cropper) return;
-    
+
+    const handleBackgroundChange = async (color) => {
+        if (!image || !cropperRef.current?.cropper) return;
         try {
             setIsProcessing(true);
             setProcessingMessage('Changing background color');
             setBackgroundColor(color);
-    
-            const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas({
-                width: cropperRef.current.cropper.getCroppedCanvas().width,
-                height: cropperRef.current.cropper.getCroppedCanvas().height
+
+            const cropper = cropperRef.current.cropper;
+            const croppedCanvas = cropper.getCroppedCanvas({
+                width: cropper.getCroppedCanvas().width,
+                height: cropper.getCroppedCanvas().height
             });
-            
+           
             const canvas = document.createElement('canvas');
             canvas.width = croppedCanvas.width;
             canvas.height = croppedCanvas.height;
             const ctx = canvas.getContext('2d');
-    
+
             ctx.fillStyle = color;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(croppedCanvas, 0, 0);
-    
+
             const newImageWithBackground = canvas.toDataURL('image/png');
+             setCorrectionImage(newImageWithBackground);
             setCroppedImage(newImageWithBackground);
-    
+             
+            // 重新计算裁剪框位置
+            const img = new Image();
+            img.onload = () => {
+                const autoCropData = intelligentCrop(img);
+                const imageData = cropper.getImageData();
+                const canvasData = cropper.getCanvasData();
+                const scaleX = canvasData.naturalWidth / imageData.naturalWidth;
+                const scaleY = canvasData.naturalHeight / imageData.naturalHeight;
+                const scaledCropLeft = autoCropData.left * scaleX;
+                const scaledCropTop = autoCropData.top * scaleY;
+                const scaledCropWidth = autoCropData.width * scaleX;
+                const scaledCropHeight = autoCropData.height * scaleY;
+
+                cropper.setCropBoxData({
+                    left: scaledCropLeft,
+                    top: scaledCropTop,
+                    width: scaledCropWidth,
+                    height: scaledCropHeight
+                });
+            };
+            img.src = newImageWithBackground;
         } catch (error) {
             console.error('Error changing background:', error);
             setProcessingMessage('Failed to change background, please try again');
@@ -285,13 +299,25 @@ function App() {
         }
     };
 
+
+    const presetColors = [
+        { name: 'White', value: '#ffffff' },
+        { name: 'Red', value: '#ff0000' },
+        { name: 'Blue', value: '#0000ff' },
+        { name: 'Bright Blue', value: '#4285F4' },
+        { name: 'Light Blue', value: '#add8e6' },
+        { name: 'Sky Blue', value: '#87ceeb' },
+        { name: 'Navy Blue', value: '#000080' },
+        { name: 'Gray', value: '#808080' },
+        { name: 'Light Gray', value: '#d3d3d3' },
+    ];
+
     return (
         <div className="app">
-            <header className="header">
+             <header className="header">
                 <h1>ID Photo Generator</h1>
                 <p>Create professional ID photos with automatic background removal</p>
             </header>
-
             <div className="process-steps">
                 <div className={`process-step ${image ? 'completed' : 'active'}`}>
                     <div className="process-step-icon">
@@ -321,7 +347,7 @@ function App() {
                     </div>
                     <div className="process-step-label">Background</div>
                 </div>
-                 <div className={`process-step ${croppedImage && backgroundColor !== '#ffffff' ? 'completed' : ''}`}>
+                <div className={`process-step ${croppedImage && backgroundColor !== '#ffffff' ? 'completed' : ''}`}>
                     <div className="process-step-icon">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -332,7 +358,7 @@ function App() {
                     <div className="process-step-label">Download</div>
                 </div>
             </div>
-            
+
 
             <div className="upload-section">
                 <div className="file-input-wrapper">
@@ -429,7 +455,7 @@ function App() {
                     )}
                 </div>
             )}
-
+           
             {croppedImage && (
                 <div className="background-selector">
                     <h3>Select background color</h3>
@@ -452,7 +478,8 @@ function App() {
                     </div>
                 </div>
             )}
-            
+
+
              {croppedImage && (
                 <div style={{ textAlign: 'center', marginTop: '2rem' }}>
                     <button 
