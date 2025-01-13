@@ -51,13 +51,16 @@ function App() {
             rightX = 0;
     
     
-        // 存储每一行的有效像素宽度
+        // 存储每一行的有效像素中心点
+        const rowCenters = [];
         const rowWidths = [];
     
     
         for (let y = 0; y < canvas.height; y++) {
             let rowLeftX = canvas.width;
             let rowRightX = 0;
+            let rowPixelCount = 0;
+            let rowCenterX = 0;
     
     
             for (let x = 0; x < canvas.width; x++) {
@@ -72,15 +75,20 @@ function App() {
                     rightX = Math.max(rightX, x);
     
     
-                    // 更新当前行的有效区域
+                    // 更新当前行的有效区域和中心
                     rowLeftX = Math.min(rowLeftX, x);
                     rowRightX = Math.max(rowRightX, x);
+                    rowCenterX += x;
+                    rowPixelCount++;
                 }
             }
     
     
-            // 记录当前行的宽度
+            // 记录行宽和中心
             rowWidths.push(rowRightX - rowLeftX);
+            if (rowPixelCount > 0) {
+                rowCenters.push(rowCenterX / rowPixelCount);
+            }
         }
     
     
@@ -115,15 +123,30 @@ function App() {
         }
     
     
+        // 计算人体中心线
+        const personCenterX = rowCenters.reduce((sum, center) => sum + center, 0) / rowCenters.length;
+    
+    
         // 裁剪框计算
         const personWidth = rightX - leftX;
         const recommendedWidth = personWidth * 0.7;  // 取70%宽度
         const recommendedHeight = recommendedWidth * (4/3);  // 3:4比例
     
     
+        // 关键优化：动态计算头顶空白
+        const headTopBuffer = Math.max(
+            recommendedHeight * 0.1,  // 最小保留10%高度作为头顶空白
+            Math.min(
+                recommendedHeight * 0.2,  // 最大不超过20%
+                (headEndY - topY) * 0.3   // 考虑实际头部区域
+            )
+        );
+    
+    
         const cropData = {
-            left: leftX + (personWidth - recommendedWidth) / 2,
-            top: headEndY,
+            // 使用人体中心线进行水平居中
+            left: personCenterX - (recommendedWidth / 2),
+            top: Math.max(topY, headEndY - headTopBuffer),  // 向上调整
             width: recommendedWidth,
             height: recommendedHeight
         };
@@ -134,14 +157,29 @@ function App() {
         cropData.top = Math.max(0, Math.min(cropData.top, img.height - cropData.height));
     
     
-        console.log('Intelligent Crop Analysis:', {
-            headEndY,
-            shoulderEndY,
+        console.log('Intelligent Crop Precise Details:', {
+            imageSize: `${img.width}x${img.height}`,
+            personArea: {
+                top: topY,
+                bottom: bottomY,
+                left: leftX,
+                right: rightX,
+                width: personWidth,
+                height: bottomY - topY,
+                centerX: personCenterX
+            },
+            cropDetails: {
+                headTopBuffer,
+                recommendedHeadHeight: recommendedHeight,
+                cropHeight: cropData.height,
+                cropWidth: cropData.width,
+                cropTop: cropData.top,
+                cropLeft: cropData.left
+            },
             widthChanges: {
                 maxChange: maxWidthChange,
                 maxChangeIndex: maxWidthChangeIndex
-            },
-            cropData
+            }
         });
     
     
