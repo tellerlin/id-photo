@@ -20,14 +20,14 @@ function App() {
 
     const presetColors = [
         { name: 'White', value: '#ffffff' },
-        { name: 'Light Blue', value: '#a6d8ff' },
-        { name: 'Blue', value: '#007bff' },
-        { name: 'Red', value: '#dc3545' },
-        { name: 'Gray', value: '#6c757d' },
-        { name: 'Light Gray', value: '#f0f0f0' },
-        { name: 'Dark Blue', value: '#003366' },
-        { name: 'Light Red', value: '#ffcccc' },
-        { name: 'Light Green', value: '#ccffcc' }
+        { name: 'Red', value: '#ff0000' },
+        { name: 'Blue', value: '#0000ff' },  // 或者 '#4285F4'
+       { name: 'Bright Blue', value: '#4285F4' },
+        { name: 'Light Blue', value: '#add8e6' }, // 或者 '#87CEEB'
+       { name: 'Sky Blue', value: '#87ceeb' },
+        { name: 'Navy Blue', value: '#000080' },  // 或者 '#191970'
+        { name: 'Gray', value: '#808080' },  // 或者 '#D3D3D3'
+         { name: 'Light Gray', value: '#d3d3d3' },
     ];
 
     useEffect(() => {
