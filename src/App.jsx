@@ -40,6 +40,8 @@ function App() {
         const aspectRatio = 3 / 4;
         const width = image.naturalWidth;
         const height = image.naturalHeight;
+        
+        console.log('Original image dimensions:', width, 'x', height);
 
         // 创建canvas分析图像
         const canvas = document.createElement('canvas');
@@ -63,6 +65,8 @@ function App() {
             }
             if (headTop !== height) break;
         }
+        
+        console.log('Detected head top position:', headTop);
 
         // 2. 检测肩部底部位置
         let shoulderBottom = 0;
@@ -77,21 +81,26 @@ function App() {
             }
             if (shoulderBottom !== 0) break;
         }
+        
+        console.log('Detected shoulder bottom position:', shoulderBottom);
 
         // 3. 计算头部高度
         const headHeight = shoulderBottom - headTop;
         
-        // 4. 计算裁剪框高度（头部高度 + 上下各10%留白）
-        const cropHeight = headHeight * 1.2;
+        // 4. 计算裁剪框高度（不超过图像高度）
+        const cropHeight = Math.min(height, headHeight * 1.2);
         
-        // 5. 根据宽高比计算裁剪框宽度
-        const cropWidth = cropHeight * aspectRatio;
+        // 5. 根据宽高比计算裁剪框宽度（不超过图像宽度）
+        const cropWidth = Math.min(width, cropHeight * aspectRatio);
         
-        // 6. 计算裁剪框位置
-        const cropTop = Math.max(0, headTop - headHeight * 0.1);
-        const cropBottom = Math.min(height, shoulderBottom + headHeight * 0.1);
+        // 6. 计算裁剪框位置（居中并考虑头部位置）
+        const cropTop = Math.max(0, headTop - (cropHeight - headHeight)/2);
         const cropLeft = Math.max(0, (width - cropWidth) / 2);
         
+        console.log('Calculated head height:', headHeight);
+        console.log('Final crop box dimensions:', cropWidth, 'x', cropHeight);
+        console.log('Final crop box position:', {left: cropLeft, top: cropTop});
+
         return {
             left: cropLeft,
             top: cropTop,
@@ -148,7 +157,21 @@ function App() {
                          setTimeout(() => {
                             if (cropperRef.current?.cropper) {
                                 const autoCropData = intelligentCrop(img);
-                                cropperRef.current.cropper.setCropBoxData(autoCropData);
+                                console.log('Auto crop data:', autoCropData);
+                                
+                                // 先设置crop box尺寸
+                                cropperRef.current.cropper.setCropBoxData({
+                                    width: autoCropData.width,
+                                    height: autoCropData.height
+                                });
+                                
+                                // 再设置crop box位置
+                                cropperRef.current.cropper.setCropBoxData({
+                                    left: autoCropData.left,
+                                    top: autoCropData.top
+                                });
+                                
+                                console.log('Cropper crop box data after set:', cropperRef.current.cropper.getCropBoxData());
                             }
                         }, 100);
 
@@ -367,7 +390,7 @@ function App() {
                             crop={handleCropChange}
                             minCropBoxWidth={100}
                             minCropBoxHeight={100}
-                           autoCropArea={0.6}  // 默认裁剪区域占比
+                           autoCropArea={1}  // 使用完整图像区域
                            viewMode={1}
                         />
                     </div>
