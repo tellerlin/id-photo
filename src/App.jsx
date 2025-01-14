@@ -20,6 +20,8 @@ function App() {
     const lastProcessedImageData = useRef(null);
     const [imageWidth, setImageWidth] = useState(0);
     const [imageHeight, setImageHeight] = useState(0);
+    const imageOverlayRef = useRef(null);
+    const imageContainerRef = useRef(null);
    
     // 新增：支持的比例选项
     const aspectRatioOptions = useMemo(() => [
@@ -335,7 +337,7 @@ function App() {
     }, [intelligentCrop]);
 
 
-    const handleCropChange = useCallback(() => {
+     const handleCropChange = useCallback(() => {
         if (!cropperRef.current?.cropper || !image) return;
         
         try {
@@ -359,8 +361,17 @@ function App() {
                 
                 // 获取画布数据并设置尺寸
                 const canvasData = cropper.getCanvasData();
+                console.log('handleCropChange Canvas Data:', {
+                     width: canvasData.width,
+                    height: canvasData.height
+                })
                 setImageWidth(Math.round(canvasData.width));
                 setImageHeight(Math.round(canvasData.height));
+
+                 if (imageContainerRef.current) {
+                    imageContainerRef.current.style.width = `${Math.round(canvasData.width)}px`;
+                     imageContainerRef.current.style.height = `${Math.round(canvasData.height)}px`;
+                }
             };
             img.src = croppedImageDataURL;
         } catch (error) {
@@ -369,22 +380,29 @@ function App() {
     }, [image]);
     
    // 使用 useLayoutEffect 来确保 outline 尺寸同步
-  useLayoutEffect(() => {
-    if (cropperRef.current?.cropper) {
-        const canvasData = cropperRef.current.cropper.getCanvasData();
-        const cropBoxData = cropperRef.current.cropper.getCropBoxData();
-        
-        console.log('Canvas Width:', canvasData.width);
-        console.log('Canvas Height:', canvasData.height);
-        console.log('CropBox Width:', cropBoxData.width);
-        console.log('CropBox Height:', cropBoxData.height);
+    useLayoutEffect(() => {
+        if (cropperRef.current?.cropper && imageOverlayRef.current && imageContainerRef.current) {
+            const canvasData = cropperRef.current.cropper.getCanvasData();
+            const cropBoxData = cropperRef.current.cropper.getCropBoxData();
+            
+             console.log('useLayoutEffect Canvas Width:', canvasData.width);
+             console.log('useLayoutEffect Canvas Height:', canvasData.height);
+            console.log('useLayoutEffect CropBox Width:', cropBoxData.width);
+            console.log('useLayoutEffect CropBox Height:', cropBoxData.height);
 
-
-        // 使用 canvasData 的尺寸
-        setImageWidth(canvasData.width);
-        setImageHeight(canvasData.height);
-    }
-}, [correctionImage, selectedAspectRatio]);
+            // 使用 canvasData 的尺寸
+            setImageWidth(Math.round(canvasData.width));
+            setImageHeight(Math.round(canvasData.height));
+            
+            // 更新 image-overlay 的尺寸
+            imageOverlayRef.current.style.width = `${Math.round(canvasData.width)}px`;
+            imageOverlayRef.current.style.height = `${Math.round(canvasData.height)}px`;
+            
+            // 更新 image-container 的尺寸
+           imageContainerRef.current.style.width = `${Math.round(canvasData.width)}px`;
+          imageContainerRef.current.style.height = `${Math.round(canvasData.height)}px`;
+        }
+    }, [correctionImage, selectedAspectRatio]);
 
 
      // 新增：处理比例选择的函数
@@ -577,33 +595,29 @@ function App() {
                                 </select>
                             </div>
                     </div>
-                    <div className="correction-section">
-                        {correctionImage && (
-
-                            <div className="image-container">
-                            <img 
-                                src={correctionImage} 
-                                alt="Correction" 
-                                className="image-base" 
-                            />
-
-                            <div className="image-overlay">
-                                <img 
-                                    src={outline} 
-                                    alt="Outline" 
-                                    style={{ 
-                                        width: '100%', 
-                                        height: '100%', 
-                                        objectFit: 'fill',
-                                        opacity: 0.5 
-                                    }} 
-                                />
-                            </div>
-                            </div>
-
-                        )}
+                   <div className="correction-section">
+                         {correctionImage && (
+                             <div className="image-container" ref={imageContainerRef}>
+                                    <img 
+                                        src={correctionImage} 
+                                        alt="Correction" 
+                                        className="image-base" 
+                                    />
+                                    <div className="image-overlay" ref={imageOverlayRef}>
+                                        <img 
+                                            src={outline} 
+                                            alt="Outline" 
+                                            style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                display: 'block',
+                                                opacity: 0.5
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                     </div>
-
                     { (croppedImage || processedImage || image) && (
                         <div className="preview-section">
                             <div className="image-container">
