@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Cropper from 'react-cropper';
 import 'cropperjs/dist/cropper.css';
 import './App.css';
@@ -18,38 +18,7 @@ function App() {
     const cropperRef = useRef(null);
     const imageRef = useRef(new Image());
     const lastProcessedImageData = useRef(null);
-    const [imageWidth, setImageWidth] = useState(0);
-    const [imageHeight, setImageHeight] = useState(0);
-    const imageOverlayRef = useRef(null);
-    const imageContainerRef = useRef(null);
-   
-    // 新增：支持的比例选项
-    const aspectRatioOptions = useMemo(() => [
-        { value: 1 / 1, label: '1:1' },
-        { value: 2 / 3, label: '2:3' },
-        { value: 3 / 4, label: '3:4' },
-        { value: 4 / 3, label: '4:3' },
-        { value: 5 / 7, label: '5:7' },
-        { value: 7 / 9, label: '7:9' },
-        { value: 9 / 7, label: '9:7' },
-    ], []);
-
-    // 新增：当前选择的比例，默认3:4
-    const [selectedAspectRatio, setSelectedAspectRatio] = useState(3 / 4);
-
-    useEffect(() => {
-        if (cropperRef.current?.cropper) {
-            const canvasData = cropperRef.current.cropper.getCanvasData();
-            const cropBoxData = cropperRef.current.cropper.getCropBoxData();
-            
-            console.log('Canvas Data:', canvasData);
-            console.log('Crop Box Data:', cropBoxData);
-            
-            setImageWidth(canvasData.width);
-            setImageHeight(canvasData.height);
-        }
-    }, [selectedAspectRatio, image]);
-
+    
     // 缓存预设颜色，避免重复渲染
     const presetColors = useMemo(() => [
         { name: 'White', value: '#ffffff' },
@@ -138,12 +107,12 @@ function App() {
             const aspectRatio = img.width / img.height;
             let recommendedWidth, recommendedHeight;
         
-             if (aspectRatio < 0.5) {  
+            if (aspectRatio < 0.5) {  
                 recommendedWidth = personWidth * 0.5; 
-                recommendedHeight = recommendedWidth * selectedAspectRatio; 
+                recommendedHeight = recommendedWidth * (4/3); 
             } else {
                 recommendedWidth = personWidth * 0.7; 
-                recommendedHeight = recommendedWidth * selectedAspectRatio;
+                recommendedHeight = recommendedWidth * (4/3); 
             }
         
             const verticalOffset = topY + (personHeight * 0.25); 
@@ -180,7 +149,7 @@ function App() {
             });
             return cropData;
         };
-    }, [selectedAspectRatio]);
+    }, []);
 
     const handleImageUpload = useCallback(async (e) => {
          const file = e.target.files[0];
@@ -337,15 +306,12 @@ function App() {
     }, [intelligentCrop]);
 
 
-     const handleCropChange = useCallback(() => {
+    const handleCropChange = useCallback(() => {
         if (!cropperRef.current?.cropper || !image) return;
         
         try {
-            const cropper = cropperRef.current.cropper;
-            const croppedCanvas = cropper.getCroppedCanvas();
+           const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas();
             const croppedImageDataURL = croppedCanvas.toDataURL('image/png');
-            
-            // 确保设置裁剪图像
             setCroppedImage(croppedImageDataURL);
             
             const img = new Image();
@@ -353,67 +319,15 @@ function App() {
                 const canvas = document.createElement('canvas');
                 canvas.width = img.width;
                 canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
+               const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0);
-                
-                // 确保设置修正图像
                 setCorrectionImage(canvas.toDataURL('image/png'));
-                
-                // 获取画布数据并设置尺寸
-                const canvasData = cropper.getCanvasData();
-                console.log('handleCropChange Canvas Data:', {
-                     width: canvasData.width,
-                    height: canvasData.height
-                })
-                setImageWidth(Math.round(canvasData.width));
-                setImageHeight(Math.round(canvasData.height));
-
-                 if (imageContainerRef.current) {
-                    imageContainerRef.current.style.width = `${Math.round(canvasData.width)}px`;
-                     imageContainerRef.current.style.height = `${Math.round(canvasData.height)}px`;
-                }
-            };
-            img.src = croppedImageDataURL;
+             };
+             img.src=croppedImageDataURL;
         } catch (error) {
-            console.error('Error updating preview:', error);
-        }
+           console.error('Error updating preview:', error);
+       }
     }, [image]);
-    
-   // 使用 useLayoutEffect 来确保 outline 尺寸同步
-    useLayoutEffect(() => {
-        if (cropperRef.current?.cropper && imageOverlayRef.current && imageContainerRef.current) {
-            const canvasData = cropperRef.current.cropper.getCanvasData();
-            const cropBoxData = cropperRef.current.cropper.getCropBoxData();
-            
-             console.log('useLayoutEffect Canvas Width:', canvasData.width);
-             console.log('useLayoutEffect Canvas Height:', canvasData.height);
-            console.log('useLayoutEffect CropBox Width:', cropBoxData.width);
-            console.log('useLayoutEffect CropBox Height:', cropBoxData.height);
-
-            // 使用 canvasData 的尺寸
-            setImageWidth(Math.round(canvasData.width));
-            setImageHeight(Math.round(canvasData.height));
-            
-            // 更新 image-overlay 的尺寸
-            imageOverlayRef.current.style.width = `${Math.round(canvasData.width)}px`;
-            imageOverlayRef.current.style.height = `${Math.round(canvasData.height)}px`;
-            
-            // 更新 image-container 的尺寸
-           imageContainerRef.current.style.width = `${Math.round(canvasData.width)}px`;
-          imageContainerRef.current.style.height = `${Math.round(canvasData.height)}px`;
-        }
-    }, [correctionImage, selectedAspectRatio]);
-
-
-     // 新增：处理比例选择的函数
-    const handleAspectRatioChange = useCallback((ratio) => {
-        setSelectedAspectRatio(ratio);
-        if (cropperRef.current?.cropper) {
-            cropperRef.current.cropper.setAspectRatio(ratio);
-             // 触发重新裁剪，更新预览
-            handleCropChange();
-         }
-    }, [handleCropChange]);
 
     const handleDownload = useCallback(async () => {
          if (!croppedImage) return;
@@ -569,7 +483,7 @@ function App() {
                         <Cropper
                             src={image}
                            style={{ height: 400, width: 300 }}
-                             aspectRatio={selectedAspectRatio}
+                            aspectRatio={3 / 4}
                             guides={true}
                            ref={cropperRef}
                             zoomable={false}
@@ -580,61 +494,38 @@ function App() {
                             autoCropArea={1}
                             viewMode={1}
                         />
-                         {/* 新增：比例选择下拉菜单 */}
-                            <div className="aspect-ratio-selector">
-                                <select
-                                    value={selectedAspectRatio}
-                                    onChange={(e) => handleAspectRatioChange(parseFloat(e.target.value))}
-                                    disabled={isProcessing}
-                                >
-                                    {aspectRatioOptions.map((option) => (
-                                        <option key={option.value} value={option.value}>
-                                            {option.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
                     </div>
-                   <div className="correction-section">
-                         {correctionImage && (
-                             <div className="image-container" ref={imageContainerRef}>
-                                    <img 
-                                        src={correctionImage} 
-                                        alt="Correction" 
-                                        className="image-base" 
-                                    />
-                                    <div className="image-overlay" ref={imageOverlayRef}>
-                                        <img 
-                                            src={outline} 
-                                            alt="Outline" 
-                                            style={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                display: 'block',
-                                                opacity: 0.5
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                            )}
+                    <div className="correction-section">
+                        {correctionImage && (
+                           <div className="image-container">
+                               <img
+                                   src={correctionImage}
+                                   alt="Correction image"
+                                   className="image-base"
+                                  style={{ display: isProcessing && !correctionImage ? 'none' : 'block' }}
+                               />
+                                 <div className="image-overlay">
+                                      <img src={outline} alt="Outline" style={{ opacity: 0.5 }} />
+                               </div>
+                           </div>
+                        )}
                     </div>
                     { (croppedImage || processedImage || image) && (
                         <div className="preview-section">
                             <div className="image-container">
-                                <img
+                                 <img
                                     key={imageKey}
                                     src={croppedImage || processedImage || image}
-                                    alt="Processed image"
+                                   alt="Processed image"
+                                    onError={(e) => {
+                                         e.target.src = '';
+                                     }}
                                     className="image-base"
                                     style={{ display: isProcessing && !(croppedImage || processedImage || image) ? 'none' : 'block' }}
-                                    onError={(e) => {
-                                        e.target.src = '';
-                                    }}
                                 />
                             </div>
                         </div>
                     )}
-
                 </div>
             )}
            {croppedImage && (
