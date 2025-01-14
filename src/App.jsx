@@ -305,30 +305,45 @@ function App() {
         }
     }, [intelligentCrop]);
 
-
-    const handleCropChange = useCallback(() => {
+    
+     const handleCropChange = useCallback(() => {
         if (!cropperRef.current?.cropper || !image) return;
-        
+    
         try {
-           const croppedCanvas = cropperRef.current.cropper.getCroppedCanvas();
+            const cropper = cropperRef.current.cropper;
+            const croppedCanvas = cropper.getCroppedCanvas();
             const croppedImageDataURL = croppedCanvas.toDataURL('image/png');
-            setCroppedImage(croppedImageDataURL);
-            
-            const img = new Image();
+        
+             // 创建一个不带背景色的correction图片
+             setCorrectionImage(croppedImageDataURL);
+    
+            // 创建一个新的 canvas，用于应用背景颜色
+             const img = new Image();
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 canvas.width = img.width;
                 canvas.height = img.height;
-               const ctx = canvas.getContext('2d');
+                const ctx = canvas.getContext('2d');
+        
+                 // 如果有之前处理过的图片数据，则使用之前的背景色，否则使用当前背景色
+               if (lastProcessedImageData.current?.backgroundColor) {
+                    ctx.fillStyle = lastProcessedImageData.current.backgroundColor;
+                } else {
+                    ctx.fillStyle = backgroundColor;
+                }
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.drawImage(img, 0, 0);
-                setCorrectionImage(canvas.toDataURL('image/png'));
-             };
-             img.src=croppedImageDataURL;
+        
+                const finalImageDataURL = canvas.toDataURL('image/png');
+                setCroppedImage(finalImageDataURL);
+            };
+             img.src = croppedImageDataURL;
+    
         } catch (error) {
-           console.error('Error updating preview:', error);
-       }
-    }, [image]);
-
+            console.error('Error updating preview:', error);
+        }
+    }, [image, backgroundColor]);
+    
     const handleDownload = useCallback(async () => {
          if (!croppedImage) return;
         
@@ -353,44 +368,54 @@ function App() {
     }, [croppedImage]);
 
 
-     const handleBackgroundChange = useCallback(async (color) => {
-         if (!image || !cropperRef.current?.cropper) return;
+    const handleBackgroundChange = useCallback(async (color) => {
+        if (!image || !cropperRef.current?.cropper) return;
     
         try {
             setIsProcessing(true);
             setProcessingMessage('Changing background color');
-           setBackgroundColor(color);
-            
-           const cropper = cropperRef.current.cropper;
+            setBackgroundColor(color); // 更新背景颜色状态
+    
+            const cropper = cropperRef.current.cropper;
             const croppedCanvas = cropper.getCroppedCanvas({
                 width: cropper.getImageData().naturalWidth,
-               height: cropper.getImageData().naturalHeight
-          });
+                height: cropper.getImageData().naturalHeight,
+            });
     
-           const canvas = document.createElement('canvas');
-           canvas.width = croppedCanvas.width;
+            const canvas = document.createElement('canvas');
+            canvas.width = croppedCanvas.width;
             canvas.height = croppedCanvas.height;
             const ctx = canvas.getContext('2d');
     
-           ctx.fillStyle = color;
-           ctx.fillRect(0, 0, canvas.width, canvas.height);
-           ctx.drawImage(croppedCanvas, 0, 0);
+            // 应用新的背景颜色
+            ctx.fillStyle = color;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(croppedCanvas, 0, 0);
     
             const newImageDataURL = canvas.toDataURL('image/png');
-           setProcessedImage(newImageDataURL);
-           setCroppedImage(newImageDataURL);
+            setProcessedImage(newImageDataURL);
+            setCroppedImage(newImageDataURL);
+            
+            lastProcessedImageData.current = {
+                dataURL: newImageDataURL,
+                width: canvas.width,
+                height: canvas.height,
+                aspectRatio: canvas.width / canvas.height,
+                backgroundColor: color,
+             };
     
             setProcessingMessage('Processing complete');
             setShowSuccessMessage(true);
             setTimeout(() => {
                 setShowSuccessMessage(false);
-           }, 3000);
+            }, 3000);
         } catch (error) {
             console.error('Background change error:', error);
         } finally {
-           setIsProcessing(false);
+            setIsProcessing(false);
         }
     }, [image]);
+    
 
     return (
        <div className="app">
@@ -482,18 +507,19 @@ function App() {
                     <div className="cropper-section">
                         <Cropper
                             src={image}
-                           style={{ height: 400, width: 300 }}
+                            style={{ height: 400, width: 300 }}
                             aspectRatio={3 / 4}
                             guides={true}
-                           ref={cropperRef}
+                            ref={cropperRef}
                             zoomable={false}
                             zoomOnWheel={false}
-                            crop={handleCropChange}
+                            crop={handleCropChange} // 确保绑定了正确的回调函数
                             minCropBoxWidth={100}
                             minCropBoxHeight={100}
                             autoCropArea={1}
                             viewMode={1}
                         />
+
                     </div>
                     <div className="correction-section">
                         {correctionImage && (
@@ -513,16 +539,19 @@ function App() {
                     { (croppedImage || processedImage || image) && (
                         <div className="preview-section">
                             <div className="image-container">
-                                 <img
-                                    key={imageKey}
+                                <img
+                                    key={imageKey} // 确保 key 的值不会在裁剪时被错误更新
                                     src={croppedImage || processedImage || image}
-                                   alt="Processed image"
+                                    alt="Processed image"
                                     onError={(e) => {
-                                         e.target.src = '';
-                                     }}
+                                        e.target.src = '';
+                                    }}
                                     className="image-base"
-                                    style={{ display: isProcessing && !(croppedImage || processedImage || image) ? 'none' : 'block' }}
+                                    style={{
+                                        display: isProcessing && !(croppedImage || processedImage || image) ? 'none' : 'block',
+                                    }}
                                 />
+
                             </div>
                         </div>
                     )}
