@@ -6,32 +6,32 @@ import outline from './assets/outline.png';
 import { removeBackground } from '@imgly/background-removal';
 
 function App() {
-  const [image, setImage] = useState(null);
-  const [processedImage, setProcessedImage] = useState(null);
-  const [croppedImage, setCroppedImage] = useState(null);
-  const [correctionImage, setCorrectionImage] = useState(null);
-  const [backgroundColor, setBackgroundColor] = useState('#ffffff');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingMessage, setProcessingMessage] = useState('');
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  const [imageKey, setImageKey] = useState(0);
+    const [image, setImage] = useState(null);
+    const [processedImage, setProcessedImage] = useState(null);
+    const [croppedImage, setCroppedImage] = useState(null);
+    const [correctionImage, setCorrectionImage] = useState(null);
+    const [backgroundColor, setBackgroundColor] = useState('#ffffff');
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [processingMessage, setProcessingMessage] = useState('');
+    const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+    const [imageKey, setImageKey] = useState(0);
     const [cropperKey, setCropperKey] = useState(0); // 新增状态变量
-  const cropperRef = useRef(null);
-  const imageRef = useRef(new Image());
-  const lastProcessedImageData = useRef(null);
+    const cropperRef = useRef(null);
+    const imageRef = useRef(new Image());
+    const lastProcessedImageData = useRef(null);
 
-  const aspectRatioOptions = useMemo(() => [
-    { value: 1 / 1, label: '1:1' },
-    { value: 2 / 3, label: '2:3' },
-    { value: 3 / 4, label: '3:4' },
-    { value: 4 / 3, label: '4:3' },
-    { value: 5 / 7, label: '5:7' },
-    { value: 7 / 9, label: '7:9' },
-    { value: 9 / 7, label: '9:7' },
-  ], []);
+    const aspectRatioOptions = useMemo(() => [
+        { value: 1 / 1, label: '1:1' },
+        { value: 2 / 3, label: '2:3' },
+        { value: 3 / 4, label: '3:4' },
+        { value: 4 / 3, label: '4:3' },
+        { value: 5 / 7, label: '5:7' },
+        { value: 7 / 9, label: '7:9' },
+        { value: 9 / 7, label: '9:7' },
+    ], []);
 
-  const [selectedAspectRatio, setSelectedAspectRatio] = useState(3 / 4);
-    
+    const [selectedAspectRatio, setSelectedAspectRatio] = useState(3 / 4);
+
     const presetColors = useMemo(() => [
         { name: 'White', value: '#ffffff' },
         { name: 'Red', value: '#ff0000' },
@@ -50,24 +50,21 @@ function App() {
         canvas.width = img.width;
         canvas.height = img.height;
         const ctx = canvas.getContext('2d');
-        
+
         ctx.drawImage(img, 0, 0);
-        
+
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
 
-
         // 检测有效区域
-        let topY = canvas.height, 
-            bottomY = 0, 
-            leftX = canvas.width, 
+        let topY = canvas.height,
+            bottomY = 0,
+            leftX = canvas.width,
             rightX = 0;
-
 
         // 存储每一行的有效像素中心点
         const rowCenters = [];
         const rowWidths = [];
-
 
         for (let y = 0; y < canvas.height; y++) {
             let rowLeftX = canvas.width;
@@ -75,18 +72,16 @@ function App() {
             let rowPixelCount = 0;
             let rowCenterX = 0;
 
-
             for (let x = 0; x < canvas.width; x++) {
                 const index = (y * canvas.width + x) * 4;
                 const alpha = data[index + 3];
-                
+
                 if (alpha > 10) {
                     // 更新总体有效区域
                     topY = Math.min(topY, y);
                     bottomY = Math.max(bottomY, y);
                     leftX = Math.min(leftX, x);
                     rightX = Math.max(rightX, x);
-
 
                     // 更新当前行的有效区域和中心
                     rowLeftX = Math.min(rowLeftX, x);
@@ -96,7 +91,6 @@ function App() {
                 }
             }
 
-
             // 记录行宽和中心
             rowWidths.push(rowRightX - rowLeftX);
             if (rowPixelCount > 0) {
@@ -104,21 +98,18 @@ function App() {
             }
         }
 
-
         // 分析宽度变化率
         const widthChanges = [];
         for (let i = 1; i < rowWidths.length; i++) {
-            const changeRate = (rowWidths[i] - rowWidths[i-1]) / rowWidths[i-1];
+            const changeRate = (rowWidths[i] - rowWidths[i - 1]) / rowWidths[i - 1];
             widthChanges.push(changeRate);
         }
-
 
         // 找到宽度变化最显著的区域
         let headEndY = topY;
         let shoulderEndY = bottomY;
         let maxWidthChangeIndex = -1;
         let maxWidthChange = 0;
-
 
         widthChanges.forEach((change, index) => {
             if (change > maxWidthChange) {
@@ -127,44 +118,38 @@ function App() {
             }
         });
 
-
         // 头部和肩部的大致位置
         if (maxWidthChangeIndex !== -1) {
             headEndY = topY + maxWidthChangeIndex;
-            // 假设肩部在头部下方一定范围内
+             // 假设肩部在头部下方一定范围内
             shoulderEndY = Math.min(bottomY, headEndY + (bottomY - topY) * 0.3);
         }
 
 
-        // 计算人体中心线
+         // 计算人体中心线
         const personCenterX = rowCenters.reduce((sum, center) => sum + center, 0) / rowCenters.length;
-
-
-        // 裁剪框计算
         const personWidth = rightX - leftX;
-        const recommendedWidth = personWidth * 0.7;  // 取70%宽度
-        
-        // 根据传入的aspectRatio动态计算高度
-        const recommendedHeight = recommendedWidth / selectedAspectRatio;
-        
-        // 动态计算头顶空白
-        const headTopBuffer = Math.max(
-            recommendedHeight * 0.1,  // 最小保留10%高度作为头顶空白
-            Math.min(
-                recommendedHeight * 0.2,  // 最大不超过20%
-                (headEndY - topY) * 0.3   // 考虑实际头部区域
-            )
-        );
+
+
+         // 计算裁剪高度
+        const personHeight = bottomY - topY;
+        const headTopBuffer = personHeight * 0.15;  // 头顶上方保留 15% 空白
+        const shoulderBottomBuffer = personHeight * 0.2; // 肩部下方保留 20% 区域
+
+        const recommendedHeight = (shoulderEndY - headEndY) + headTopBuffer + shoulderBottomBuffer;
+
+         // 根据高度和宽高比计算宽度
+        let recommendedWidth = recommendedHeight * selectedAspectRatio;
+    
 
 
         const cropData = {
             // 使用人体中心线进行水平居中
             left: personCenterX - (recommendedWidth / 2),
-            top: Math.max(topY, headEndY - headTopBuffer),  // 向上调整
+            top: Math.max(topY, headEndY - headTopBuffer),
             width: recommendedWidth,
             height: recommendedHeight
         };
-
 
         // 安全边界检查
         cropData.left = Math.max(0, Math.min(cropData.left, img.width - cropData.width));
@@ -196,42 +181,41 @@ function App() {
             }
         });
 
-
         return cropData;
     };
 
 
     const handleAspectRatioChange = useCallback((event) => {
-        setSelectedAspectRatio(parseFloat(event.target.value));
-         setCropperKey(prevKey => prevKey + 1);
+        const newAspectRatio = parseFloat(event.target.value);
+        setSelectedAspectRatio(newAspectRatio);
+        setCropperKey(prevKey => prevKey + 1);
+
         // 重新触发智能裁剪
         if (imageRef.current.src) {
             setTimeout(() => {
                 if (cropperRef.current?.cropper) {
-                     const img = imageRef.current;
-                    // 重新计算裁剪框
-                            const autoCropData = intelligentCrop(img, selectedAspectRatio);
-                            const imageData = cropperRef.current.cropper.getImageData();
-                            const canvasData = cropperRef.current.cropper.getCanvasData();
-    
-    
-                            const scaleX = canvasData.width / imageData.naturalWidth;
-                            const scaleY = canvasData.height / imageData.naturalHeight;
-    
-                            const scaledCropData = {
-                                left: autoCropData.left * scaleX,
-                                top: autoCropData.top * scaleY,
-                                width: autoCropData.width * scaleX,
-                                height: autoCropData.height * scaleY
-                            };
-                           cropperRef.current.cropper.setCropBoxData(scaledCropData);
+                    const img = imageRef.current;
+                   // 重新计算裁剪框
+                    const autoCropData = intelligentCrop(img, newAspectRatio);
+                    const imageData = cropperRef.current.cropper.getImageData();
+                    const canvasData = cropperRef.current.cropper.getCanvasData();
+
+                    const scaleX = canvasData.width / imageData.naturalWidth;
+                    const scaleY = canvasData.height / imageData.naturalHeight;
+
+                    const scaledCropData = {
+                        left: autoCropData.left * scaleX,
+                        top: autoCropData.top * scaleY,
+                        width: autoCropData.width * scaleX,
+                        height: autoCropData.height * scaleY
+                    };
+                  cropperRef.current.cropper.setCropBoxData(scaledCropData);
                        
-                    
                   }
-            },100)
+            }, 100)
         }
 
-    }, [image,selectedAspectRatio,intelligentCrop]);
+    }, [image, intelligentCrop]);
 
     const handleImageUpload = useCallback(async (e) => {
         const file = e.target.files[0];
@@ -321,10 +305,10 @@ function App() {
                                 console.log('Scale Factors:', { scaleX, scaleY });
 
                                 const scaledCropData = {
-                                  left: autoCropData.left * scaleX,
-                                  top: autoCropData.top * scaleY,
-                                  width: autoCropData.width * scaleX,
-                                  height: autoCropData.height * scaleY
+                                    left: autoCropData.left * scaleX,
+                                    top: autoCropData.top * scaleY,
+                                    width: autoCropData.width * scaleX,
+                                    height: autoCropData.height * scaleY
                                 };
 
                                 console.log('Scaled Crop Data:', scaledCropData);
@@ -370,63 +354,63 @@ function App() {
         }
     }, [intelligentCrop, selectedAspectRatio]);
 
-  const handleCropChange = useCallback(() => {
-    if (!cropperRef.current?.cropper || !image) return;
+    const handleCropChange = useCallback(() => {
+        if (!cropperRef.current?.cropper || !image) return;
 
-    try {
-      const cropper = cropperRef.current.cropper;
-      const croppedCanvas = cropper.getCroppedCanvas();
-      const croppedImageDataURL = croppedCanvas.toDataURL('image/png');
+        try {
+            const cropper = cropperRef.current.cropper;
+            const croppedCanvas = cropper.getCroppedCanvas();
+            const croppedImageDataURL = croppedCanvas.toDataURL('image/png');
 
-      setCorrectionImage(croppedImageDataURL);
+            setCorrectionImage(croppedImageDataURL);
 
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
 
-        if (lastProcessedImageData.current?.backgroundColor) {
-          ctx.fillStyle = lastProcessedImageData.current.backgroundColor;
-        } else {
-          ctx.fillStyle = backgroundColor;
+                if (lastProcessedImageData.current?.backgroundColor) {
+                    ctx.fillStyle = lastProcessedImageData.current.backgroundColor;
+                } else {
+                    ctx.fillStyle = backgroundColor;
+                }
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+
+                const finalImageDataURL = canvas.toDataURL('image/png');
+                setCroppedImage(finalImageDataURL);
+            };
+            img.src = croppedImageDataURL;
+
+        } catch (error) {
+            console.error('Error updating preview:', error);
         }
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
+    }, [image, backgroundColor]);
 
-        const finalImageDataURL = canvas.toDataURL('image/png');
-        setCroppedImage(finalImageDataURL);
-      };
-      img.src = croppedImageDataURL;
+    const handleDownload = useCallback(async () => {
+        if (!croppedImage) return;
 
-    } catch (error) {
-      console.error('Error updating preview:', error);
-    }
-  }, [image, backgroundColor]);
-
-  const handleDownload = useCallback(async () => {
-    if (!croppedImage) return;
-
-    try {
-      const response = await fetch(croppedImage);
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'id-photo.png';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error downloading image:', error);
-      setProcessingMessage('Download failed, please try again');
-      setTimeout(() => {
-        setProcessingMessage('');
-      }, 3000);
-    }
-  }, [croppedImage]);
+        try {
+            const response = await fetch(croppedImage);
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'id-photo.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Error downloading image:', error);
+            setProcessingMessage('Download failed, please try again');
+            setTimeout(() => {
+                setProcessingMessage('');
+            }, 3000);
+        }
+    }, [croppedImage]);
 
     const handleBackgroundChange = useCallback(async (color) => {
         if (!image || !cropperRef.current?.cropper) return;
@@ -475,211 +459,211 @@ function App() {
         }
     }, [image]);
 
-  return (
-      <div className="app">
-        <header className="header">
-          <h1>ID Photo Generator</h1>
-          <p>Create professional ID photos with automatic background removal</p>
-        </header>
-        <div className="process-steps">
-          <div className={`process-step ${image ? 'completed' : 'active'}`}>
-            <div className="process-step-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-            </div>
-            <div className="process-step-label">Upload</div>
-          </div>
-          <div className={`process-step ${croppedImage ? 'completed' : (image ? 'active' : '')}`}>
-            <div className="process-step-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <line x1="9" y1="9" x2="15" y2="15" />
-                <line x1="15" y1="9" x2="9" y2="15" />
-              </svg>
-            </div>
-            <div className="process-step-label">Crop</div>
-          </div>
-          <div className={`process-step ${backgroundColor !== '#ffffff' ? 'completed' : (croppedImage ? 'active' : '')}`}>
-            <div className="process-step-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            </div>
-            <div className="process-step-label">Background</div>
-          </div>
-          <div className={`process-step ${croppedImage && backgroundColor !== '#ffffff' ? 'completed' : ''}`}>
-            <div className="process-step-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-            </div>
-            <div className="process-step-label">Download</div>
-          </div>
-        </div>
-        <div className="upload-section">
-          <div className="file-input-wrapper">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="file-input"
-              disabled={isProcessing}
-            />
-            <button className={`upload-button ${isProcessing ? 'disabled' : ''} ${isProcessing ? 'loading-button' : ''}`}>
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              {isProcessing ? 'Processing' : 'Upload photo'}
-            </button>
-          </div>
-          {showSuccessMessage && (
-            <div className="success-message">
-              Image uploaded successfully!
-            </div>
-          )}
-        </div>
-          {image && (
-            <div className="aspect-ratio-selector">
-              <h3>Select Aspect Ratio</h3>
-                <select
-                    value={selectedAspectRatio}
-                    onChange={handleAspectRatioChange}
-                    className="aspect-ratio-dropdown"
-                >
-                  {aspectRatioOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                    </option>
-                ))}
-              </select>
-            </div>
-          )}
-        {image && (
-          <div className="editor-container">
-            <div className={`processing-overlay ${isProcessing ? 'visible' : ''}`}>
-              <div className="loading-spinner">
-                <div className="spinner-circle"></div>
-                <div className="spinner-text">{processingMessage}</div>
-              </div>
-            </div>
-            <div className="cropper-section">
-              <Cropper
-                 key={cropperKey}
-                src={image}
-                style={{ height: 400, width: 300 }}
-                aspectRatio={selectedAspectRatio}
-                guides={true}
-                ref={cropperRef}
-                zoomable={false}
-                zoomOnWheel={false}
-                crop={handleCropChange}
-                minCropBoxWidth={100}
-                minCropBoxHeight={100}
-                autoCropArea={1}
-                viewMode={1}
-              />
-            </div>
-            <div className="correction-section">
-              {correctionImage && (
-                <div className="image-container">
-                  <img
-                    src={correctionImage}
-                    alt="Correction image"
-                    className="image-base"
-                    style={{ display: isProcessing && !correctionImage ? 'none' : 'block' }}
-                  />
-                  <div className="image-overlay">
-                    <img src={outline} alt="Outline" style={{ opacity: 0.5 }} />
-                  </div>
+    return (
+        <div className="app">
+            <header className="header">
+                <h1>ID Photo Generator</h1>
+                <p>Create professional ID photos with automatic background removal</p>
+            </header>
+            <div className="process-steps">
+                <div className={`process-step ${image ? 'completed' : 'active'}`}>
+                    <div className="process-step-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                    </div>
+                    <div className="process-step-label">Upload</div>
                 </div>
-              )}
-            </div>
-            {(croppedImage || processedImage || image) && (
-              <div className="preview-section">
-                <div className="image-container">
-                  <img
-                    key={imageKey}
-                    src={croppedImage || processedImage || image}
-                    alt="Processed image"
-                    onError={(e) => {
-                        e.target.src = '';
-                    }}
-                    className="image-base"
-                    style={{
-                      display: isProcessing && !(croppedImage || processedImage || image) ? 'none' : 'block',
-                    }}
-                  />
+                <div className={`process-step ${croppedImage ? 'completed' : (image ? 'active' : '')}`}>
+                    <div className="process-step-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                            <line x1="9" y1="9" x2="15" y2="15" />
+                            <line x1="15" y1="9" x2="9" y2="15" />
+                        </svg>
+                    </div>
+                    <div className="process-step-label">Crop</div>
                 </div>
-              </div>
+                <div className={`process-step ${backgroundColor !== '#ffffff' ? 'completed' : (croppedImage ? 'active' : '')}`}>
+                    <div className="process-step-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                        </svg>
+                    </div>
+                    <div className="process-step-label">Background</div>
+                </div>
+                <div className={`process-step ${croppedImage && backgroundColor !== '#ffffff' ? 'completed' : ''}`}>
+                    <div className="process-step-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                    </div>
+                    <div className="process-step-label">Download</div>
+                </div>
+            </div>
+            <div className="upload-section">
+                <div className="file-input-wrapper">
+                    <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="file-input"
+                        disabled={isProcessing}
+                    />
+                    <button className={`upload-button ${isProcessing ? 'disabled' : ''} ${isProcessing ? 'loading-button' : ''}`}>
+                        <svg
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                        {isProcessing ? 'Processing' : 'Upload photo'}
+                    </button>
+                </div>
+                {showSuccessMessage && (
+                    <div className="success-message">
+                        Image uploaded successfully!
+                    </div>
+                )}
+            </div>
+            {image && (
+                <div className="aspect-ratio-selector">
+                    <h3>Select Aspect Ratio</h3>
+                    <select
+                        value={selectedAspectRatio}
+                        onChange={handleAspectRatioChange}
+                        className="aspect-ratio-dropdown"
+                    >
+                        {aspectRatioOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                                {option.label}
+                            </option>
+                        ))}
+                    </select>
+                </div>
             )}
-          </div>
-        )}
-        {croppedImage && (
-          <div className="background-selector">
-            <h3>Select background color</h3>
-            <div className="color-buttons">
-              {presetColors.map((color) => (
-                <button
-                  key={color.value}
-                  className={`color-button ${backgroundColor === color.value ? 'selected' : ''}`}
-                  data-color={color.name}
-                  style={{
-                    backgroundColor: color.value,
-                    color: color.name.startsWith('Light') || color.name === 'White' ? 'black' : 'white',
-                  }}
-                  onClick={() => handleBackgroundChange(color.value)}
-                  disabled={isProcessing}
-                >
-                  {color.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {croppedImage && (
-          <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-            <button
-              onClick={handleDownload}
-              className={`button button-primary ${isProcessing ? 'loading-button' : ''}`}
-              disabled={isProcessing}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ marginRight: '0.5rem' }}
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              Download photo
-            </button>
-          </div>
-        )}
-      </div>
-  );
+            {image && (
+                <div className="editor-container">
+                    <div className={`processing-overlay ${isProcessing ? 'visible' : ''}`}>
+                        <div className="loading-spinner">
+                            <div className="spinner-circle"></div>
+                            <div className="spinner-text">{processingMessage}</div>
+                        </div>
+                    </div>
+                    <div className="cropper-section">
+                        <Cropper
+                            key={cropperKey}
+                            src={image}
+                            style={{ height: 400, width: 300 }}
+                            aspectRatio={selectedAspectRatio}
+                            guides={true}
+                            ref={cropperRef}
+                            zoomable={false}
+                            zoomOnWheel={false}
+                            crop={handleCropChange}
+                            minCropBoxWidth={100}
+                            minCropBoxHeight={100}
+                            autoCropArea={1}
+                            viewMode={1}
+                        />
+                    </div>
+                    <div className="correction-section">
+                        {correctionImage && (
+                            <div className="image-container">
+                                <img
+                                    src={correctionImage}
+                                    alt="Correction image"
+                                    className="image-base"
+                                    style={{ display: isProcessing && !correctionImage ? 'none' : 'block' }}
+                                />
+                                <div className="image-overlay">
+                                    <img src={outline} alt="Outline" style={{ opacity: 0.5 }} />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    {(croppedImage || processedImage || image) && (
+                        <div className="preview-section">
+                            <div className="image-container">
+                                <img
+                                    key={imageKey}
+                                    src={croppedImage || processedImage || image}
+                                    alt="Processed image"
+                                    onError={(e) => {
+                                        e.target.src = '';
+                                    }}
+                                    className="image-base"
+                                    style={{
+                                        display: isProcessing && !(croppedImage || processedImage || image) ? 'none' : 'block',
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+            {croppedImage && (
+                <div className="background-selector">
+                    <h3>Select background color</h3>
+                    <div className="color-buttons">
+                        {presetColors.map((color) => (
+                            <button
+                                key={color.value}
+                                className={`color-button ${backgroundColor === color.value ? 'selected' : ''}`}
+                                data-color={color.name}
+                                style={{
+                                    backgroundColor: color.value,
+                                    color: color.name.startsWith('Light') || color.name === 'White' ? 'black' : 'white',
+                                }}
+                                onClick={() => handleBackgroundChange(color.value)}
+                                disabled={isProcessing}
+                            >
+                                {color.name}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+            {croppedImage && (
+                <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+                    <button
+                        onClick={handleDownload}
+                        className={`button button-primary ${isProcessing ? 'loading-button' : ''}`}
+                        disabled={isProcessing}
+                    >
+                        <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{ marginRight: '0.5rem' }}
+                        >
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        Download photo
+                    </button>
+                </div>
+            )}
+        </div>
+    );
 }
 
 export default App;
