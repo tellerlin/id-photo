@@ -47,132 +47,164 @@ function App() {
     { name: 'Light Gray', value: '#d3d3d3' },
   ], []);
 
-  const intelligentCrop = useMemo(() => {
-    return (img, aspectRatio) => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
+  const intelligentCrop = (img, selectedAspectRatio) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    
+    ctx.drawImage(img, 0, 0);
+    
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
 
-      let topY = canvas.height,
-        bottomY = 0,
-        leftX = canvas.width,
+
+    // 检测有效区域
+    let topY = canvas.height, 
+        bottomY = 0, 
+        leftX = canvas.width, 
         rightX = 0;
 
-      const rowCenters = [];
-      const rowWidths = [];
 
-      for (let y = 0; y < canvas.height; y++) {
+    // 存储每一行的有效像素中心点
+    const rowCenters = [];
+    const rowWidths = [];
+
+
+    for (let y = 0; y < canvas.height; y++) {
         let rowLeftX = canvas.width;
         let rowRightX = 0;
         let rowPixelCount = 0;
         let rowCenterX = 0;
 
+
         for (let x = 0; x < canvas.width; x++) {
-          const index = (y * canvas.width + x) * 4;
-          const alpha = data[index + 3];
-          if (alpha > 10) {
-            topY = Math.min(topY, y);
-            bottomY = Math.max(bottomY, y);
-            leftX = Math.min(leftX, x);
-            rightX = Math.max(rightX, x);
-            rowLeftX = Math.min(rowLeftX, x);
-            rowRightX = Math.max(rowRightX, x);
-            rowCenterX += x;
-            rowPixelCount++;
-          }
+            const index = (y * canvas.width + x) * 4;
+            const alpha = data[index + 3];
+            
+            if (alpha > 10) {
+                // 更新总体有效区域
+                topY = Math.min(topY, y);
+                bottomY = Math.max(bottomY, y);
+                leftX = Math.min(leftX, x);
+                rightX = Math.max(rightX, x);
+
+
+                // 更新当前行的有效区域和中心
+                rowLeftX = Math.min(rowLeftX, x);
+                rowRightX = Math.max(rowRightX, x);
+                rowCenterX += x;
+                rowPixelCount++;
+            }
         }
 
+
+        // 记录行宽和中心
         rowWidths.push(rowRightX - rowLeftX);
         if (rowPixelCount > 0) {
-          rowCenters.push(rowCenterX / rowPixelCount);
+            rowCenters.push(rowCenterX / rowPixelCount);
         }
-      }
+    }
 
-      const widthChanges = [];
-      for (let i = 1; i < rowWidths.length; i++) {
-        const changeRate = (rowWidths[i] - rowWidths[i - 1]) / rowWidths[i - 1];
+
+    // 分析宽度变化率
+    const widthChanges = [];
+    for (let i = 1; i < rowWidths.length; i++) {
+        const changeRate = (rowWidths[i] - rowWidths[i-1]) / rowWidths[i-1];
         widthChanges.push(changeRate);
-      }
+    }
 
-      let headEndY = topY;
-      let shoulderEndY = bottomY;
-      let maxWidthChangeIndex = -1;
-      let maxWidthChange = 0;
 
-      widthChanges.forEach((change, index) => {
+    // 找到宽度变化最显著的区域
+    let headEndY = topY;
+    let shoulderEndY = bottomY;
+    let maxWidthChangeIndex = -1;
+    let maxWidthChange = 0;
+
+
+    widthChanges.forEach((change, index) => {
         if (change > maxWidthChange) {
-          maxWidthChange = change;
-          maxWidthChangeIndex = index;
+            maxWidthChange = change;
+            maxWidthChangeIndex = index;
         }
-      });
+    });
 
-      if (maxWidthChangeIndex !== -1) {
+
+    // 头部和肩部的大致位置
+    if (maxWidthChangeIndex !== -1) {
         headEndY = topY + maxWidthChangeIndex;
+        // 假设肩部在头部下方一定范围内
         shoulderEndY = Math.min(bottomY, headEndY + (bottomY - topY) * 0.3);
-      }
-
-      const personCenterX = rowCenters.reduce((sum, center) => sum + center, 0) / rowCenters.length;
-      const personWidth = rightX - leftX;
-      const personHeight = bottomY - topY;
-      let recommendedWidth, recommendedHeight;
+    }
 
 
-      if (aspectRatio < 1) {
-        recommendedWidth = personWidth * 0.5;
-        recommendedHeight = recommendedWidth / aspectRatio;
-      } else {
-        recommendedHeight = personHeight * 0.5;
-        recommendedWidth = recommendedHeight * aspectRatio;
-      }
+    // 计算人体中心线
+    const personCenterX = rowCenters.reduce((sum, center) => sum + center, 0) / rowCenters.length;
 
-      if (recommendedWidth > personWidth * 0.9) {
-        recommendedWidth = personWidth * 0.9;
-        recommendedHeight = recommendedWidth / aspectRatio;
-      }
-      if (recommendedHeight > personHeight * 0.9) {
-        recommendedHeight = personHeight * 0.9;
-        recommendedWidth = recommendedHeight * aspectRatio;
-      }
 
-      const verticalOffset = topY + (personHeight * 0.25);
-      const cropData = {
+    // 裁剪框计算
+    const personWidth = rightX - leftX;
+    const recommendedWidth = personWidth * 0.7;  // 取70%宽度
+
+
+    // 根据传入的aspectRatio动态计算高度
+    const recommendedHeight = selectedAspectRatio 
+        ? recommendedWidth / selectedAspectRatio 
+        : recommendedWidth * (4/3);  // 默认3:4比例
+
+
+    // 动态计算头顶空白
+    const headTopBuffer = Math.max(
+        recommendedHeight * 0.1,  // 最小保留10%高度作为头顶空白
+        Math.min(
+            recommendedHeight * 0.2,  // 最大不超过20%
+            (headEndY - topY) * 0.3   // 考虑实际头部区域
+        )
+    );
+
+
+    const cropData = {
+        // 使用人体中心线进行水平居中
         left: personCenterX - (recommendedWidth / 2),
-        top: verticalOffset,
+        top: Math.max(topY, headEndY - headTopBuffer),  // 向上调整
         width: recommendedWidth,
         height: recommendedHeight
-      };
+    };
 
-      cropData.left = Math.max(0, Math.min(cropData.left, img.width - cropData.width));
-      cropData.top = Math.max(0, Math.min(cropData.top, img.height - cropData.height));
 
-      console.log('Intelligent Crop Precise Details:', {
+    // 安全边界检查
+    cropData.left = Math.max(0, Math.min(cropData.left, img.width - cropData.width));
+    cropData.top = Math.max(0, Math.min(cropData.top, img.height - cropData.height));
+
+
+    console.log('Intelligent Crop Precise Details:', {
         imageSize: `${img.width}x${img.height}`,
-        aspectRatio: aspectRatio,
         personArea: {
-          top: topY,
-          bottom: bottomY,
-          left: leftX,
-          right: rightX,
-          width: personWidth,
-          height: personHeight,
-          centerX: personCenterX
+            top: topY,
+            bottom: bottomY,
+            left: leftX,
+            right: rightX,
+            width: personWidth,
+            height: bottomY - topY,
+            centerX: personCenterX
         },
         cropDetails: {
-          verticalOffset,
-          recommendedHeadHeight: recommendedHeight,
-          cropHeight: cropData.height,
-          cropWidth: cropData.width,
-          cropTop: cropData.top,
-          cropLeft: cropData.left
+            headTopBuffer,
+            recommendedHeadHeight: recommendedHeight,
+            cropHeight: cropData.height,
+            cropWidth: cropData.width,
+            cropTop: cropData.top,
+            cropLeft: cropData.left
+        },
+        widthChanges: {
+            maxChange: maxWidthChange,
+            maxChangeIndex: maxWidthChangeIndex
         }
-      });
-      return cropData;
-    };
-  }, []);
+    });
+
+
+    return cropData;
+};
 
   const handleImageUpload = useCallback(async (e) => {
     const file = e.target.files[0];
