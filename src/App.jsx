@@ -48,126 +48,133 @@ function App() {
         { name: 'Light Gray', value: '#d3d3d3' },
     ], []);
 
-    const intelligentCrop = useMemo(() => (img, selectedAspectRatio) => {
-        const canvas = canvasRef.current;
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
+   const intelligentCrop = useMemo(() => (img, selectedAspectRatio) => {
+      const canvas = canvasRef.current;
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
 
-        ctx.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0);
 
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
 
-        let topY = canvas.height,
-        bottomY = 0,
-        leftX = canvas.width,
-        rightX = 0;
+      let topY = canvas.height,
+          bottomY = 0,
+          leftX = canvas.width,
+          rightX = 0;
 
-        const rowCenters = [];
-        const rowWidths = [];
+      const rowCenters = [];
+      const rowWidths = [];
 
-        for (let y = 0; y < canvas.height; y++) {
-            let rowLeftX = canvas.width;
-            let rowRightX = 0;
-            let rowPixelCount = 0;
-            let rowCenterX = 0;
+      for (let y = 0; y < canvas.height; y++) {
+          let rowLeftX = canvas.width;
+          let rowRightX = 0;
+          let rowPixelCount = 0;
+          let rowCenterX = 0;
 
-            for (let x = 0; x < canvas.width; x++) {
-                const index = (y * canvas.width + x) * 4;
-                const alpha = data[index + 3];
+          for (let x = 0; x < canvas.width; x++) {
+              const index = (y * canvas.width + x) * 4;
+              const alpha = data[index + 3];
 
-                if (alpha > 10) {
-                    topY = Math.min(topY, y);
-                    bottomY = Math.max(bottomY, y);
-                    leftX = Math.min(leftX, x);
-                    rightX = Math.max(rightX, x);
+              if (alpha > 10) {
+                  topY = Math.min(topY, y);
+                  bottomY = Math.max(bottomY, y);
+                  leftX = Math.min(leftX, x);
+                  rightX = Math.max(rightX, x);
 
-                    rowLeftX = Math.min(rowLeftX, x);
-                    rowRightX = Math.max(rowRightX, x);
-                    rowCenterX += x;
-                    rowPixelCount++;
-                }
-            }
+                  rowLeftX = Math.min(rowLeftX, x);
+                  rowRightX = Math.max(rowRightX, x);
+                  rowCenterX += x;
+                  rowPixelCount++;
+              }
+          }
 
-            rowWidths.push(rowRightX - rowLeftX);
-            if (rowPixelCount > 0) {
-                rowCenters.push(rowCenterX / rowPixelCount);
-            }
-        }
+          rowWidths.push(rowRightX - rowLeftX);
+          if (rowPixelCount > 0) {
+              rowCenters.push(rowCenterX / rowPixelCount);
+          }
+      }
 
-        const widthChanges = [];
-        for (let i = 1; i < rowWidths.length; i++) {
-            const changeRate = (rowWidths[i] - rowWidths[i - 1]) / rowWidths[i - 1];
-            widthChanges.push(changeRate);
-        }
+      const widthChanges = [];
+      for (let i = 1; i < rowWidths.length; i++) {
+          const changeRate = (rowWidths[i] - rowWidths[i - 1]) / rowWidths[i - 1];
+          widthChanges.push(changeRate);
+      }
 
-        let headEndY = topY;
-        let shoulderEndY = bottomY;
-        let maxWidthChangeIndex = -1;
-        let maxWidthChange = 0;
+      let headEndY = topY;
+      let shoulderEndY = bottomY;
+      let maxWidthChangeIndex = -1;
+      let maxWidthChange = 0;
 
-        widthChanges.forEach((change, index) => {
-            if (change > maxWidthChange) {
-                maxWidthChange = change;
-                maxWidthChangeIndex = index;
-            }
-        });
+      widthChanges.forEach((change, index) => {
+          if (change > maxWidthChange) {
+              maxWidthChange = change;
+              maxWidthChangeIndex = index;
+          }
+      });
 
-        if (maxWidthChangeIndex !== -1) {
-            headEndY = topY + maxWidthChangeIndex;
-            shoulderEndY = Math.min(bottomY, headEndY + (bottomY - topY) * 0.3);
-        }
+      if (maxWidthChangeIndex !== -1) {
+          headEndY = topY + maxWidthChangeIndex;
+          shoulderEndY = Math.min(bottomY, headEndY + (bottomY - topY) * 0.3);
+      }
 
-        const personCenterX = rowCenters.reduce((sum, center) => sum + center, 0) / rowCenters.length;
-        const personWidth = rightX - leftX;
+      const personCenterX = rowCenters.reduce((sum, center) => sum + center, 0) / rowCenters.length;
+      const personWidth = rightX - leftX;
+      const personHeight = bottomY - topY;
 
-        const personHeight = bottomY - topY;
-        const headTopBuffer = personHeight * 0.15;
-        const shoulderBottomBuffer = personHeight * 0.2;
 
-        const recommendedHeight = (shoulderEndY - headEndY) + headTopBuffer + shoulderBottomBuffer;
+      const headTopBuffer = personHeight * 0.15;
+      const shoulderBottomBuffer = personHeight * 0.2;
 
-        let recommendedWidth = recommendedHeight * selectedAspectRatio;
 
-        const cropData = {
-            left: personCenterX - (recommendedWidth / 2),
-            top: Math.max(topY, headEndY - headTopBuffer),
-            width: recommendedWidth,
-            height: recommendedHeight
-        };
+      // Correctly calculate the recommended height
+      const recommendedHeight = (shoulderEndY - headEndY) + headTopBuffer + shoulderBottomBuffer;
 
-        cropData.left = Math.max(0, Math.min(cropData.left, img.width - cropData.width));
-        cropData.top = Math.max(0, Math.min(cropData.top, img.height - cropData.height));
+      // Based on the height and aspect ratio calculate the width
+      let recommendedWidth = recommendedHeight * selectedAspectRatio;
 
-         console.log('Intelligent Crop Precise Details:', {
-            imageSize: `${img.width}x${img.height}`,
-            personArea: {
-                top: topY,
-                bottom: bottomY,
-                left: leftX,
-                right: rightX,
-                width: personWidth,
-                height: bottomY - topY,
-                centerX: personCenterX
-            },
-            cropDetails: {
-                headTopBuffer,
-                recommendedHeadHeight: recommendedHeight,
-                cropHeight: cropData.height,
-                cropWidth: cropData.width,
-                cropTop: cropData.top,
-                cropLeft: cropData.left
-            },
-            widthChanges: {
-                maxChange: maxWidthChange,
-                maxChangeIndex: maxWidthChangeIndex
-            }
-        });
 
-        return cropData;
-    }, []);
+       const cropData = {
+         left: personCenterX - (recommendedWidth / 2),
+         top: Math.max(topY, headEndY - headTopBuffer),
+         width: recommendedWidth,
+         height: recommendedHeight
+      };
 
+
+       // Ensure the crop box stays within image bounds
+      cropData.left = Math.max(0, Math.min(cropData.left, img.width - cropData.width));
+      cropData.top = Math.max(0, Math.min(cropData.top, img.height - cropData.height));
+
+
+       console.log('Intelligent Crop Precise Details:', {
+          imageSize: `${img.width}x${img.height}`,
+          personArea: {
+              top: topY,
+              bottom: bottomY,
+              left: leftX,
+              right: rightX,
+              width: personWidth,
+              height: bottomY - topY,
+              centerX: personCenterX
+          },
+          cropDetails: {
+              headTopBuffer,
+             recommendedHeadHeight: recommendedHeight,
+              cropHeight: cropData.height,
+              cropWidth: cropData.width,
+              cropTop: cropData.top,
+              cropLeft: cropData.left
+          },
+          widthChanges: {
+              maxChange: maxWidthChange,
+              maxChangeIndex: maxWidthChangeIndex
+          }
+      });
+
+      return cropData;
+  }, []);
 
     const handleAspectRatioChange = useCallback((event) => {
         const newAspectRatio = parseFloat(event.target.value);
@@ -264,11 +271,13 @@ function App() {
                             height: img.height,
                             aspectRatio: img.width / img.height
                         };
+                         // Use a timeout to ensure the cropper instance is ready
                         setTimeout(() => {
                             if (cropperRef.current?.cropper) {
-                                const cropper = cropperRef.current.cropper;
-                                const autoCropData = intelligentCrop(img, selectedAspectRatio);
-                                console.log('Auto crop data:', autoCropData);
+                                 const cropper = cropperRef.current.cropper;
+                                 const autoCropData = intelligentCrop(img, selectedAspectRatio);
+                                 console.log('Auto crop data:', autoCropData);
+
 
                                 const imageData = cropper.getImageData();
                                 const canvasData = cropper.getCanvasData();
@@ -298,11 +307,25 @@ function App() {
                                     height: autoCropData.height * scaleY
                                 };
 
+
                                 console.log('Scaled Crop Data:', scaledCropData);
+
+
+                                // 1. Get the cropper container element
+                                const cropperContainer = cropperRef.current.cropper.container;
+
+
+                                // 2. Apply the calculated height to the container to enforce the calculated size
+                                 cropperContainer.style.height = `${scaledCropData.height}px`;
+
+                                // 3. Set Crop Box Data after height is set
                                 cropper.setCropBoxData(scaledCropData);
                                 console.log('Final Cropper Box Configuration:', cropper.getCropBoxData());
+
+
                             }
-                        }, 100);
+                         }, 100)
+
 
                         setProcessingMessage('Processing complete');
                         setShowSuccessMessage(true);
@@ -567,7 +590,6 @@ function App() {
                             <CropperComponent
                                 key={cropperKey}
                                 src={image}
-                                style={{ height: 400, width: 300 }}
                                 aspectRatio={selectedAspectRatio}
                                 guides={true}
                                 ref={cropperRef}
