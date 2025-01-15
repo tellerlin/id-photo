@@ -53,102 +53,107 @@ function App() {
         canvas.width = img.width;
         canvas.height = img.height;
         const ctx = canvas.getContext('2d');
-  
+
         ctx.drawImage(img, 0, 0);
-  
+
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
-  
+
         let topY = canvas.height,
             bottomY = 0,
             leftX = canvas.width,
             rightX = 0;
-  
+
         const rowCenters = [];
         const rowWidths = [];
-  
+        const minPixelThreshold = 20; // 最小像素数量阈值
+
         for (let y = 0; y < canvas.height; y++) {
             let rowLeftX = canvas.width;
             let rowRightX = 0;
             let rowPixelCount = 0;
             let rowCenterX = 0;
-  
+            let rowHasValidPixels = false; // 标记该行是否包含足够数量的有效像素
+
             for (let x = 0; x < canvas.width; x++) {
                 const index = (y * canvas.width + x) * 4;
                 const alpha = data[index + 3];
-  
+
                 if (alpha > 10) {
+                    rowHasValidPixels = true; // 只要有一个像素就标记为true
                     topY = Math.min(topY, y);
                     bottomY = Math.max(bottomY, y);
                     leftX = Math.min(leftX, x);
                     rightX = Math.max(rightX, x);
-  
+
                     rowLeftX = Math.min(rowLeftX, x);
                     rowRightX = Math.max(rowRightX, x);
                     rowCenterX += x;
                     rowPixelCount++;
                 }
             }
-  
-            rowWidths.push(rowRightX - rowLeftX);
-            if (rowPixelCount > 0) {
+
+             if (rowPixelCount >= minPixelThreshold && rowHasValidPixels) {
+                rowWidths.push(rowRightX - rowLeftX);
                 rowCenters.push(rowCenterX / rowPixelCount);
             }
         }
-  
+
         const widthChanges = [];
         for (let i = 1; i < rowWidths.length; i++) {
-            const changeRate = (rowWidths[i] - rowWidths[i - 1]) / rowWidths[i - 1];
-            widthChanges.push(changeRate);
+             if (rowWidths[i - 1] > 0) {
+                const changeRate = (rowWidths[i] - rowWidths[i - 1]) / rowWidths[i - 1];
+                widthChanges.push(changeRate);
+            }
         }
-  
+
         let headEndY = topY;
         let shoulderEndY = bottomY;
         let maxWidthChangeIndex = -1;
         let maxWidthChange = 0;
-  
+
         widthChanges.forEach((change, index) => {
             if (change > maxWidthChange) {
                 maxWidthChange = change;
                 maxWidthChangeIndex = index;
             }
         });
-  
-        if (maxWidthChangeIndex !== -1) {
-            headEndY = topY + maxWidthChangeIndex;
-            shoulderEndY = Math.min(bottomY, headEndY + (bottomY - topY) * 0.3);
-        }
-  
+
+          if (maxWidthChangeIndex !== -1) {
+              headEndY = topY + maxWidthChangeIndex;
+              shoulderEndY = Math.min(bottomY, headEndY + (bottomY - topY) * 0.3);
+          }
+
         const personCenterX = rowCenters.reduce((sum, center) => sum + center, 0) / rowCenters.length;
         const personWidth = rightX - leftX;
         const personHeight = bottomY - topY;
-  
-  
+
+
         const headTopBuffer = personHeight * 0.15;
         const shoulderBottomBuffer = personHeight * 0.2;
-  
-  
+
+
         // Correctly calculate the recommended height
         const recommendedHeight = (shoulderEndY - headEndY) + headTopBuffer + shoulderBottomBuffer;
-  
+
         // Based on the height and aspect ratio calculate the width
         let recommendedWidth = recommendedHeight * selectedAspectRatio;
-  
-  
-         const cropData = {
-           left: personCenterX - (recommendedWidth / 2),
-           top: Math.max(topY, headEndY - headTopBuffer),
-           width: recommendedWidth,
-           height: recommendedHeight
+
+
+        const cropData = {
+            left: personCenterX - (recommendedWidth / 2),
+            top: Math.max(topY, headEndY - headTopBuffer),
+            width: recommendedWidth,
+            height: recommendedHeight
         };
-  
-  
-         // Ensure the crop box stays within image bounds
+
+
+        // Ensure the crop box stays within image bounds
         cropData.left = Math.max(0, Math.min(cropData.left, img.width - cropData.width));
         cropData.top = Math.max(0, Math.min(cropData.top, img.height - cropData.height));
-  
-  
-         console.log('Intelligent Crop Precise Details:', {
+
+
+        console.log('Intelligent Crop Precise Details:', {
             imageSize: `${img.width}x${img.height}`,
             personArea: {
                 top: topY,
@@ -161,7 +166,7 @@ function App() {
             },
             cropDetails: {
                 headTopBuffer,
-               recommendedHeadHeight: recommendedHeight,
+                recommendedHeadHeight: recommendedHeight,
                 cropHeight: cropData.height,
                 cropWidth: cropData.width,
                 cropTop: cropData.top,
@@ -172,10 +177,10 @@ function App() {
                 maxChangeIndex: maxWidthChangeIndex
             }
         });
-  
+
         return cropData;
     }, []);
-  
+
     const handleAspectRatioChange = useCallback((event) => {
           const newAspectRatio = parseFloat(event.target.value);
           setSelectedAspectRatio(newAspectRatio);
