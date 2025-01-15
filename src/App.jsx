@@ -48,323 +48,311 @@ function App() {
         { name: 'Light Gray', value: '#d3d3d3' },
     ], []);
 
-   const intelligentCrop = useMemo(() => (img, selectedAspectRatio) => {
-      const canvas = canvasRef.current;
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
 
-      ctx.drawImage(img, 0, 0);
+  const intelligentCrop = useMemo(() => (img, selectedAspectRatio) => {
+    const canvas = canvasRef.current;
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
 
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
+    ctx.drawImage(img, 0, 0);
 
-      let topY = canvas.height,
-          bottomY = 0,
-          leftX = canvas.width,
-          rightX = 0;
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
 
-      const rowCenters = [];
-      const rowWidths = [];
+    let topY = canvas.height,
+        bottomY = 0,
+        leftX = canvas.width,
+        rightX = 0;
 
-      for (let y = 0; y < canvas.height; y++) {
-          let rowLeftX = canvas.width;
-          let rowRightX = 0;
-          let rowPixelCount = 0;
-          let rowCenterX = 0;
+    const rowCenters = [];
+    const rowWidths = [];
 
-          for (let x = 0; x < canvas.width; x++) {
-              const index = (y * canvas.width + x) * 4;
-              const alpha = data[index + 3];
+    for (let y = 0; y < canvas.height; y++) {
+        let rowLeftX = canvas.width;
+        let rowRightX = 0;
+        let rowPixelCount = 0;
+        let rowCenterX = 0;
 
-              if (alpha > 10) {
-                  topY = Math.min(topY, y);
-                  bottomY = Math.max(bottomY, y);
-                  leftX = Math.min(leftX, x);
-                  rightX = Math.max(rightX, x);
+        for (let x = 0; x < canvas.width; x++) {
+            const index = (y * canvas.width + x) * 4;
+            const alpha = data[index + 3];
 
-                  rowLeftX = Math.min(rowLeftX, x);
-                  rowRightX = Math.max(rowRightX, x);
-                  rowCenterX += x;
-                  rowPixelCount++;
-              }
-          }
+            if (alpha > 10) {
+                topY = Math.min(topY, y);
+                bottomY = Math.max(bottomY, y);
+                leftX = Math.min(leftX, x);
+                rightX = Math.max(rightX, x);
 
-          rowWidths.push(rowRightX - rowLeftX);
-          if (rowPixelCount > 0) {
-              rowCenters.push(rowCenterX / rowPixelCount);
-          }
-      }
-
-      const widthChanges = [];
-      for (let i = 1; i < rowWidths.length; i++) {
-          const changeRate = (rowWidths[i] - rowWidths[i - 1]) / rowWidths[i - 1];
-          widthChanges.push(changeRate);
-      }
-
-      let headEndY = topY;
-      let shoulderEndY = bottomY;
-      let maxWidthChangeIndex = -1;
-      let maxWidthChange = 0;
-
-      widthChanges.forEach((change, index) => {
-          if (change > maxWidthChange) {
-              maxWidthChange = change;
-              maxWidthChangeIndex = index;
-          }
-      });
-
-      if (maxWidthChangeIndex !== -1) {
-          headEndY = topY + maxWidthChangeIndex;
-          shoulderEndY = Math.min(bottomY, headEndY + (bottomY - topY) * 0.3);
-      }
-
-      const personCenterX = rowCenters.reduce((sum, center) => sum + center, 0) / rowCenters.length;
-      const personWidth = rightX - leftX;
-      const personHeight = bottomY - topY;
-
-
-      const headTopBuffer = personHeight * 0.15;
-      const shoulderBottomBuffer = personHeight * 0.2;
-
-
-      // Correctly calculate the recommended height
-      const recommendedHeight = (shoulderEndY - headEndY) + headTopBuffer + shoulderBottomBuffer;
-
-      // Based on the height and aspect ratio calculate the width
-      let recommendedWidth = recommendedHeight * selectedAspectRatio;
-
-
-       const cropData = {
-         left: personCenterX - (recommendedWidth / 2),
-         top: Math.max(topY, headEndY - headTopBuffer),
-         width: recommendedWidth,
-         height: recommendedHeight
-      };
-
-
-       // Ensure the crop box stays within image bounds
-      cropData.left = Math.max(0, Math.min(cropData.left, img.width - cropData.width));
-      cropData.top = Math.max(0, Math.min(cropData.top, img.height - cropData.height));
-
-
-       console.log('Intelligent Crop Precise Details:', {
-          imageSize: `${img.width}x${img.height}`,
-          personArea: {
-              top: topY,
-              bottom: bottomY,
-              left: leftX,
-              right: rightX,
-              width: personWidth,
-              height: bottomY - topY,
-              centerX: personCenterX
-          },
-          cropDetails: {
-              headTopBuffer,
-             recommendedHeadHeight: recommendedHeight,
-              cropHeight: cropData.height,
-              cropWidth: cropData.width,
-              cropTop: cropData.top,
-              cropLeft: cropData.left
-          },
-          widthChanges: {
-              maxChange: maxWidthChange,
-              maxChangeIndex: maxWidthChangeIndex
-          }
-      });
-
-      return cropData;
-  }, []);
-
-    const handleAspectRatioChange = useCallback((event) => {
-        const newAspectRatio = parseFloat(event.target.value);
-        setSelectedAspectRatio(newAspectRatio);
-        setCropperKey(prevKey => prevKey + 1);
-
-         if (imageRef.current.src) {
-            setTimeout(() => {
-                 if (cropperRef.current?.cropper) {
-                     const img = imageRef.current;
-                     const autoCropData = intelligentCrop(img, newAspectRatio);
-                     const imageData = cropperRef.current.cropper.getImageData();
-                     const canvasData = cropperRef.current.cropper.getCanvasData();
-
-                     const scaleX = canvasData.width / imageData.naturalWidth;
-                     const scaleY = canvasData.height / imageData.naturalHeight;
-
-                     const scaledCropData = {
-                        left: autoCropData.left * scaleX,
-                        top: autoCropData.top * scaleY,
-                        width: autoCropData.width * scaleX,
-                        height: autoCropData.height * scaleY
-                    };
-                    cropperRef.current.cropper.setCropBoxData(scaledCropData);
-                  }
-            }, 100)
+                rowLeftX = Math.min(rowLeftX, x);
+                rowRightX = Math.max(rowRightX, x);
+                rowCenterX += x;
+                rowPixelCount++;
+            }
         }
 
-    }, [image, intelligentCrop]);
+        rowWidths.push(rowRightX - rowLeftX);
+        if (rowPixelCount > 0) {
+            rowCenters.push(rowCenterX / rowPixelCount);
+        }
+    }
+
+    const widthChanges = [];
+    for (let i = 1; i < rowWidths.length; i++) {
+        const changeRate = (rowWidths[i] - rowWidths[i - 1]) / rowWidths[i - 1];
+        widthChanges.push(changeRate);
+    }
+
+    let headEndY = topY;
+    let shoulderEndY = bottomY;
+    let maxWidthChangeIndex = -1;
+    let maxWidthChange = 0;
+
+    widthChanges.forEach((change, index) => {
+        if (change > maxWidthChange) {
+            maxWidthChange = change;
+            maxWidthChangeIndex = index;
+        }
+    });
+
+    if (maxWidthChangeIndex !== -1) {
+        headEndY = topY + maxWidthChangeIndex;
+        shoulderEndY = Math.min(bottomY, headEndY + (bottomY - topY) * 0.3);
+    }
+
+    const personCenterX = rowCenters.reduce((sum, center) => sum + center, 0) / rowCenters.length;
+    const personWidth = rightX - leftX;
+    const personHeight = bottomY - topY;
 
 
-    const handleImageUpload = useCallback(async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        try {
-            setImage(null);
-            setProcessedImage(null);
-            setCroppedImage(null);
-            setIsProcessing(true);
-            setProcessingMessage('Processing image');
-            setShowSuccessMessage(false);
-            setImageKey((prevKey) => prevKey + 1);
-            setCorrectionImage(null);
-
-            console.group('Image Upload and Processing');
-            console.time('TotalProcessingTime');
-
-            const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/tiff', 'image/svg+xml'];
-            if (!validTypes.includes(file.type)) {
-               setProcessingMessage(`Unsupported file type. Supported formats: ${validTypes.join(', ')}`);
-               throw new Error(`Unsupported file type. Supported formats: ${validTypes.join(', ')}`);
-            }
+    const headTopBuffer = personHeight * 0.15;
+    const shoulderBottomBuffer = personHeight * 0.2;
 
 
-            const [blob] = await Promise.all([
-                removeBackground(file)
-            ]);
+    // Correctly calculate the recommended height
+    const recommendedHeight = (shoulderEndY - headEndY) + headTopBuffer + shoulderBottomBuffer;
+
+    // Based on the height and aspect ratio calculate the width
+    let recommendedWidth = recommendedHeight * selectedAspectRatio;
 
 
-             if (!blob) {
-                setProcessingMessage('Background removal failed.');
-                 throw new Error('Background removal failed.');
-            }
+     const cropData = {
+       left: personCenterX - (recommendedWidth / 2),
+       top: Math.max(topY, headEndY - headTopBuffer),
+       width: recommendedWidth,
+       height: recommendedHeight
+    };
 
 
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
+     // Ensure the crop box stays within image bounds
+    cropData.left = Math.max(0, Math.min(cropData.left, img.width - cropData.width));
+    cropData.top = Math.max(0, Math.min(cropData.top, img.height - cropData.height));
+
+
+     console.log('Intelligent Crop Precise Details:', {
+        imageSize: `${img.width}x${img.height}`,
+        personArea: {
+            top: topY,
+            bottom: bottomY,
+            left: leftX,
+            right: rightX,
+            width: personWidth,
+            height: bottomY - topY,
+            centerX: personCenterX
+        },
+        cropDetails: {
+            headTopBuffer,
+           recommendedHeadHeight: recommendedHeight,
+            cropHeight: cropData.height,
+            cropWidth: cropData.width,
+            cropTop: cropData.top,
+            cropLeft: cropData.left
+        },
+        widthChanges: {
+            maxChange: maxWidthChange,
+            maxChangeIndex: maxWidthChangeIndex
+        }
+    });
+
+    return cropData;
+}, []);
+
+const handleAspectRatioChange = useCallback((event) => {
+      const newAspectRatio = parseFloat(event.target.value);
+      setSelectedAspectRatio(newAspectRatio);
+      setCropperKey(prevKey => prevKey + 1);
+
+      if (imageRef.current.src) {
+          setTimeout(() => {
+              if (cropperRef.current?.cropper) {
+                  const img = imageRef.current;
+                  const autoCropData = intelligentCrop(img, newAspectRatio);
+                  const imageData = cropperRef.current.cropper.getImageData();
+                  const canvasData = cropperRef.current.cropper.getCanvasData();
+
+                  const scaleX = canvasData.width / imageData.naturalWidth;
+                  const scaleY = canvasData.height / imageData.naturalHeight;
+
+                  const scaledCropData = {
+                     left: autoCropData.left * scaleX,
+                     top: autoCropData.top * scaleY,
+                     width: autoCropData.width * scaleX,
+                     height: autoCropData.height * scaleY
+                 };
+                 cropperRef.current.cropper.setCropBoxData(scaledCropData);
+               }
+         }, 100)
+     }
+ }, [image, intelligentCrop]);
+
+
+const handleImageUpload = useCallback(async (e) => {
+    const file = e.target.files[0];
+      if (!file) return;
+
+     try {
+         setImage(null);
+         setProcessedImage(null);
+         setCroppedImage(null);
+         setIsProcessing(true);
+         setProcessingMessage('Processing image');
+         setShowSuccessMessage(false);
+         setImageKey((prevKey) => prevKey + 1);
+         setCorrectionImage(null);
+
+          console.group('Image Upload and Processing');
+          console.time('TotalProcessingTime');
+
+         const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/tiff', 'image/svg+xml'];
+         if (!validTypes.includes(file.type)) {
+            setProcessingMessage(`Unsupported file type. Supported formats: ${validTypes.join(', ')}`);
+            throw new Error(`Unsupported file type. Supported formats: ${validTypes.join(', ')}`);
+          }
+
+
+         const [blob] = await Promise.all([
+              removeBackground(file)
+         ]);
+
+          if (!blob) {
+               setProcessingMessage('Background removal failed.');
+               throw new Error('Background removal failed.');
+          }
+
+
+         return new Promise((resolve, reject) => {
+               const reader = new FileReader();
+               reader.onloadend = () => {
                     const safeDataURL = reader.result.startsWith('data:image')
-                        ? reader.result
-                        : `data:image/png;base64,${reader.result}`;
-                     imageRef.current.onload = () => {
+                       ? reader.result
+                       : `data:image/png;base64,${reader.result}`;
+                    imageRef.current.onload = () => {
                          const img = imageRef.current;
-                        console.log('Image Loaded Details:', {
+                         console.log('Image Loaded Details:', {
+                           width: img.width,
+                           height: img.height,
+                           aspectRatio: img.width / img.height
+                         });
+
+                           const canvas = canvasRef.current;
+                          canvas.width = img.width;
+                          canvas.height = img.height;
+                          const ctx = canvas.getContext('2d');
+                          ctx.drawImage(img, 0, 0);
+
+                          const finalDataURL = canvas.toDataURL('image/png');
+                          setImage(finalDataURL);
+                          setProcessedImage(finalDataURL);
+                          setCroppedImage(finalDataURL);
+                         lastProcessedImageData.current = {
+                             dataURL: finalDataURL,
                              width: img.width,
-                            height: img.height,
-                            aspectRatio: img.width / img.height
-                        });
-
-                         const canvas = canvasRef.current;
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        const ctx = canvas.getContext('2d');
-                         ctx.drawImage(img, 0, 0);
-
-                        const finalDataURL = canvas.toDataURL('image/png');
-                        setImage(finalDataURL);
-                        setProcessedImage(finalDataURL);
-                        setCroppedImage(finalDataURL);
-                        lastProcessedImageData.current = {
-                            dataURL: finalDataURL,
-                            width: img.width,
-                            height: img.height,
-                            aspectRatio: img.width / img.height
-                        };
-                         // Use a timeout to ensure the cropper instance is ready
-                        setTimeout(() => {
-                            if (cropperRef.current?.cropper) {
-                                 const cropper = cropperRef.current.cropper;
-                                 const autoCropData = intelligentCrop(img, selectedAspectRatio);
-                                 console.log('Auto crop data:', autoCropData);
+                             height: img.height,
+                             aspectRatio: img.width / img.height
+                         };
+                        // Use a timeout to ensure the cropper instance is ready
+                          setTimeout(() => {
+                              if (cropperRef.current?.cropper) {
+                                   const cropper = cropperRef.current.cropper;
+                                   const autoCropData = intelligentCrop(img, selectedAspectRatio);
+                                   console.log('Auto crop data:', autoCropData);
 
 
-                                const imageData = cropper.getImageData();
-                                const canvasData = cropper.getCanvasData();
+                                   const imageData = cropper.getImageData();
+                                   const canvasData = cropper.getCanvasData();
 
-                                console.log('Image Data:', {
-                                    naturalWidth: imageData.naturalWidth,
-                                    naturalHeight: imageData.naturalHeight,
-                                    width: imageData.width,
-                                    height: imageData.height
-                                });
+                                   console.log('Image Data:', {
+                                      naturalWidth: imageData.naturalWidth,
+                                       naturalHeight: imageData.naturalHeight,
+                                      width: imageData.width,
+                                       height: imageData.height
+                                  });
 
-                                console.log('Canvas Data:', {
-                                    naturalWidth: canvasData.naturalWidth,
-                                    naturalHeight: canvasData.naturalHeight,
-                                    width: canvasData.width,
-                                    height: canvasData.height
-                                });
+                                  console.log('Canvas Data:', {
+                                      naturalWidth: canvasData.naturalWidth,
+                                      naturalHeight: canvasData.naturalHeight,
+                                      width: canvasData.width,
+                                     height: canvasData.height
+                                  });
 
-                                const scaleX = canvasData.width / imageData.naturalWidth;
-                                const scaleY = canvasData.height / imageData.naturalHeight;
-                                console.log('Scale Factors:', { scaleX, scaleY });
+                                  const scaleX = canvasData.width / imageData.naturalWidth;
+                                  const scaleY = canvasData.height / imageData.naturalHeight;
+                                  console.log('Scale Factors:', { scaleX, scaleY });
 
-                                const scaledCropData = {
-                                    left: autoCropData.left * scaleX,
-                                    top: autoCropData.top * scaleY,
-                                    width: autoCropData.width * scaleX,
-                                    height: autoCropData.height * scaleY
-                                };
+                                 const scaledCropData = {
+                                      left: autoCropData.left * scaleX,
+                                      top: autoCropData.top * scaleY,
+                                      width: autoCropData.width * scaleX,
+                                      height: autoCropData.height * scaleY
+                                  };
 
 
                                 console.log('Scaled Crop Data:', scaledCropData);
 
-
-                                // 1. Get the cropper container element
-                                const cropperContainer = cropperRef.current.cropper.container;
-
-
-                                // 2. Apply the calculated height to the container to enforce the calculated size
-                                 cropperContainer.style.height = `${scaledCropData.height}px`;
-
-                                // 3. Set Crop Box Data after height is set
                                 cropper.setCropBoxData(scaledCropData);
                                 console.log('Final Cropper Box Configuration:', cropper.getCropBoxData());
-
-
                             }
-                         }, 100)
+                       }, 100)
 
 
                         setProcessingMessage('Processing complete');
                         setShowSuccessMessage(true);
-                        setTimeout(() => {
-                            setShowSuccessMessage(false);
-                        }, 3000);
+                       setTimeout(() => {
+                             setShowSuccessMessage(false);
+                          }, 3000);
 
-                        console.timeEnd('TotalProcessingTime');
-                         console.groupEnd();
-                        resolve();
-                    };
+                          console.timeEnd('TotalProcessingTime');
+                          console.groupEnd();
+                         resolve();
+                     };
 
-                    imageRef.current.onerror = () => {
-                        console.error('Image Loading Failed');
-                        setIsProcessing(false);
-                        setProcessingMessage('Image loading failed.');
-                       reject(new Error('Image loading failed'));
-                    };
-                    imageRef.current.src = safeDataURL;
-                };
-                reader.onerror = () => {
-                    console.error('File Reading Failed');
-                    setIsProcessing(false);
-                    setProcessingMessage('File reading failed.');
-                   reject(new Error('File reading failed'));
-                };
-                reader.readAsDataURL(blob);
-            });
-        } catch (error) {
-            console.error('Image Processing Error:', error);
-           setProcessingMessage(error.message || 'Processing failed');
-             setImage(null);
-            setProcessedImage(null);
-            setCroppedImage(null);
-            setCorrectionImage(null);
-        } finally {
-            setIsProcessing(false);
-        }
-    }, [intelligentCrop, selectedAspectRatio]);
+                      imageRef.current.onerror = () => {
+                         console.error('Image Loading Failed');
+                         setIsProcessing(false);
+                         setProcessingMessage('Image loading failed.');
+                         reject(new Error('Image loading failed'));
+                     };
+                  imageRef.current.src = safeDataURL;
+              };
+               reader.onerror = () => {
+                  console.error('File Reading Failed');
+                  setIsProcessing(false);
+                  setProcessingMessage('File reading failed.');
+                 reject(new Error('File reading failed'));
+              };
+              reader.readAsDataURL(blob);
+         });
+     } catch (error) {
+         console.error('Image Processing Error:', error);
+         setProcessingMessage(error.message || 'Processing failed');
+         setImage(null);
+         setProcessedImage(null);
+        setCroppedImage(null);
+         setCorrectionImage(null);
+     } finally {
+         setIsProcessing(false);
+     }
+ }, [intelligentCrop, selectedAspectRatio]);
 
 
     const handleCropChange = useCallback(() => {
